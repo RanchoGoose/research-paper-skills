@@ -633,12 +633,24 @@ def protect_caps(title):
     return ' '.join(one(t) for t in title.split())
 
 
-def make_key(title, year, taken):
-    """Key in the same shape the rest of the bibliography uses: the paper's
-    short name plus its year -- selfforcing2025, mukv2026, tethercache2026."""
-    head = title.split(':')[0]
-    slug = re.sub(r'[^a-z0-9]', '', head.lower())[:20] or 'ref'
-    base = '%s%s' % (slug, year or '')
+def make_key(title, year, taken, authors=None):
+    """Key in the same shape the rest of the bibliography uses.
+
+    Papers with a short name before the colon get that name plus the year --
+    selfforcing2025, mukv2026, tethercache2026. Titles with no such name fall
+    back to the other standard convention, first author surname plus year
+    (vaswani2017), because slicing a long title mid-word produces keys like
+    "attentionisallyounee2017".
+    """
+    head = title.split(':')[0].strip()
+    slug = ''
+    if ':' in title and len(head.split()) <= 4:
+        slug = re.sub(r'[^a-z0-9]', '', head.lower())
+    if not slug and authors:
+        slug = re.sub(r'[^a-z0-9]', '', bib_author(authors[0]).split(',')[0].lower())
+    if not slug:                       # no colon, no authors: first two words
+        slug = re.sub(r'[^a-z0-9]', '', ' '.join(title.split()[:2]).lower())
+    base = '%s%s' % (slug[:24] or 'ref', year or '')
     key, n = base, 1
     while key in taken:
         n += 1
@@ -726,7 +738,7 @@ def cmd_add(bib_path, query, am_key, use_dblp, dry_run):
         print("  要更新出处就跑:--only %s --fix" % dup['key'])
         return 1
 
-    key = make_key(title, year, {e['key'] for e in existing})
+    key = make_key(title, year, {e['key'] for e in existing}, authors)
     entry = render_entry(key, title, authors, year, venue_act, arxiv_id)
 
     print("标题  : %s" % title)

@@ -179,6 +179,16 @@ check("head before colon + year",
 check("acronym title", V.make_key('MuKV: Multi-Grained KV', '2026', set()), 'mukv2026')
 check("collision gets a suffix",
       V.make_key('MuKV: Multi-Grained KV', '2026', {'mukv2026'}), 'mukv2026a')
+# Slicing a long title mid-word gives keys like "attentionisallyounee2017";
+# fall back to the other standard convention instead.
+check("no colon -> first author surname",
+      V.make_key('Attention Is All You Need', '2017', set(), ['Ashish Vaswani']),
+      'vaswani2017')
+check("colon head too long -> surname",
+      V.make_key('Towards a General Theory of Everything: A Study', '2024', set(),
+                 ['Jane Roe']), 'roe2024')
+check("no colon and no authors", 
+      V.make_key('Attention Is All You Need', '2017', set(), None), 'attentionis2017')
 
 section("--add: render_entry — canonical layout, nothing invented")
 e = V.render_entry('longlive2026', 'LongLive: Real-time Interactive Long Video Generation',
