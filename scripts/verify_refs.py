@@ -234,7 +234,12 @@ def q_arxiv(entry):
         return {'err': None, 'title': ti,
                 'authors': [a.find('a:name', NS).text for a in e.findall('a:author', NS)],
                 'jref': jr.text if jr is not None else None}
-    return {'err': 'no-title-match', 'title': None, 'authors': None, 'jref': None}
+    # "Not on arXiv" is an answer, not a failure -- plenty of real papers never
+    # get posted (journal-only, Nature, older proceedings). Caching that as an
+    # error would re-query it forever. But when the bib *gave* an id and the
+    # title still does not match, that is a genuine discrepancy worth surfacing.
+    return {'err': 'no-title-match' if entry['arxiv'] else 'not-on-arxiv',
+            'title': None, 'authors': None, 'jref': None}
 
 
 def aminer_key():
@@ -665,7 +670,7 @@ def main():
                      errs=[x for x in (ax['err'], orv['err'], cr['err'],
                                        (dv or {}).get('err'),
                                        (am or {}).get('err')) if x
-                           and x not in ('no-doi', 'no-key')])
+                           and x not in ('no-doi', 'no-key', 'not-on-arxiv')])
             cache[ck] = r
             json.dump(cache, open(cache_path, 'w', encoding='utf-8'),
                       ensure_ascii=False, indent=1)
