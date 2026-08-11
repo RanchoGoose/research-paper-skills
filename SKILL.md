@@ -1,28 +1,74 @@
 ---
-name: ref-verify
-description: 论文引用一条龙——核实每条引用真实存在、查出真正的会议/期刊出处、按统一格式(会议一律 "Proceedings of 全称")改写 .bib,并揪出被拒/仅 workshop 的论文。用于投稿前引文核查、补新引用、统一引用格式、或任何"这篇到底真不真/发在哪/该怎么写"的问题。触发词:引文核对、查 venue、references 核对、bib 更新、引用格式、统一格式、投稿前检查、citation check、verify references、bibliography。
+name: bibguard
+description: 写 paper 时所有 reference 与 citation 的唯一入口——新增一条引用(查证后自动生成格式正确的 bib 条目)、核实每条引用真实存在、查出真正的会议/期刊出处、按统一格式(会议一律 "Proceedings of 全称")改写 .bib、揪出被拒/仅 workshop 以及正文没引用的条目。**写论文时凡涉及引用一律走这个 skill,不要凭记忆手写 bib 条目。** 触发词:加引用、补引用、引用这篇、这篇发在哪、引文核对、查 venue、references、参考文献、bib、citation、cite、bibliography、引用格式、投稿前检查。
 ---
 
-# 论文引用核对与格式统一(ref-verify)
+# 写 paper 的引用总管(bibguard)
 
-一个 skill 管三件事:**① 这篇论文真的存在吗 ② 它到底发在哪 ③ 全篇引用格式统一**。
+**一条铁律:凡是往 `.bib` 里写东西,都走这个 skill,不要凭记忆手写条目。**
+模型记忆里的引用有相当比例是错的——标题对但作者错、年份错、会议错,甚至整篇不存在。
+这个 skill 的全部意义就是让每一条引用都有来源可查。
+
+一个 skill 管四件事:**① 加引用 ② 这篇论文真的存在吗 ③ 它到底发在哪 ④ 全篇格式统一**。
 
 ```bash
-S=.claude/skills/ref-verify/scripts/verify_refs.py
+S=.claude/skills/bibguard/scripts/bibguard.py
 
-python3 $S references.bib                 # 核对 + 报告(默认读缓存,可安全重跑)
-python3 $S references.bib --fix           # 顺便把出处和格式写回 .bib(自动存 .bak)
-python3 $S references.bib --only k1,k2    # 只查这几条
-python3 $S references.bib --refresh       # 忽略缓存重查(投稿前必做)
-python3 $S references.bib --json r.json   # 机器可读输出
+python3 $S references.bib --add "<论文标题>"    # 查证后生成并追加一条(查不到就拒绝)
+python3 $S references.bib --add 2506.08009     # 也能直接给 arXiv id 或 DOI
+python3 $S references.bib                      # 核对 + 报告(读缓存,可安全重跑)
+python3 $S references.bib --fix                # 把出处和格式写回 .bib(自动存 .bak)
+python3 $S references.bib --only k1,k2         # 只查这几条
+python3 $S references.bib --refresh            # 忽略缓存重查(投稿前必做)
 python3 $S references.bib --uncited main.tex   # 列出正文没引用的条目
-python3 $S references.bib --pause 2       # 限流严重时在每个源的最小间隔上再加秒数
+python3 $S references.bib --json r.json        # 机器可读输出
+python3 $S references.bib --pause 2            # 限流严重时在每个源的最小间隔上再加秒数
 ```
 
 退出码 **0 = 无需改动;1 = 有条目待处理**,可直接当投稿前 gate。
 缓存在 `.refcache.json`(与 .bib 同目录,记得 gitignore),中断重跑不会重复请求。
 
 改脚本前先跑 `python3 tests/test_offline.py`(纯离线,不联网)。
+
+## 加一条引用:`--add`
+
+给标题、arXiv id 或 DOI 都行。它会先把这篇论文查证一遍,再生成条目:
+
+```bash
+$ python3 $S references.bib --add "LongLive: Real-time Interactive Long Video Generation"
+
+标题  : LongLive: Real-time Interactive Long Video Generation
+出处  : Proceedings of the International Conference on Learning Representations (ICLR)
+锚点  : arXiv:2509.22622, openreview, aminer
+证据  : OR:ICLR 2026 Poster || AMINER:ICLR 2026 (2026) [proceedings-article]
+
+@inproceedings{longlive2026,
+  title     = {{LongLive}: Real-time Interactive Long Video Generation},
+  author    = {Yang, Shuai and Huang, Wei and ... and Chen, Yukang},
+  booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
+  year      = {2026},
+  note      = {Poster; arXiv:2509.22622}
+}
+```
+
+生成时自动处理掉几个手写必错的细节:
+
+- **作者名反转**成 BibTeX 要的 `Last, First`,小写介词跟着姓走(`van den Berg, Rianne`)。
+- **缩写加花括号**:`{MuKV}` / `{KV}` / `{NVFP4}`,否则某些 `.bst` 会渲染成 `Mukv`。
+  连字符词按普通标题大小写处理,`Multi-Grained`、`Train-Test` 不会被多余地括起来。
+- **citation key** 跟全篇同一套写法:标题冒号前的短名 + 年份 → `longlive2026`、`mukv2026`;
+  撞 key 自动加后缀。
+- **标题、作者、年份全部取自权威记录**,不用你提供的那一版(你给的可能是旧名)。
+
+三种它会**拒绝写入**的情况(这是 guard 的部分):
+
+| 情况 | 行为 |
+|---|---|
+| 查不到这篇 | ✗ 拒绝,提示换个标题或给 id。**绝不编一条看起来很像真的** |
+| 查到标题但没有任何独立锚点 | ✗ 拒绝,要求人工核原文后手写 |
+| 这篇已经在 .bib 里了 | · 提示已存在的 key,并告诉你用 `--only <key> --fix` 更新出处 |
+
+`--dry-run` 只打印不写文件。写入前自动存 `.bak`。
 
 ## 铁律一:收录标准
 
@@ -206,4 +252,4 @@ bash install.sh --user                   # 装到 ~/.claude/skills(全局可用)
 ```
 
 只依赖 Python 3 标准库,无需 pip、无需 API key。
-公开仓库:https://github.com/RanchoGoose/ref-verify
+公开仓库:https://github.com/RanchoGoose/bibguard

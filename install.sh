@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install ref-verify as a Claude Code skill, into one project or globally.
+# Install bibguard as a Claude Code skill, into one project or globally.
 #
 #   bash install.sh /path/to/project   # -> that project's .claude/skills/
 #   bash install.sh --user             # -> ~/.claude/skills/ (every project)
@@ -9,7 +9,7 @@
 set -euo pipefail
 
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NAME=ref-verify
+NAME=bibguard
 
 case "${1:---user}" in
   --user) DEST="$HOME/.claude/skills/$NAME" ;;
@@ -36,11 +36,11 @@ mkdir -p "$DEST/scripts" "$DEST/tests"
 for f in SKILL.md README.md LICENSE install.sh; do
   [ -f "$SRC/$f" ] && cp "$SRC/$f" "$DEST/"
 done
-cp "$SRC/scripts/verify_refs.py" "$SRC/scripts/venues.json" "$DEST/scripts/"
+cp "$SRC/scripts/bibguard.py" "$SRC/scripts/venues.json" "$DEST/scripts/"
 for f in test_offline.py sample.bib; do
   [ -f "$SRC/tests/$f" ] && cp "$SRC/tests/$f" "$DEST/tests/"
 done
-chmod +x "$DEST/scripts/verify_refs.py" "$DEST/install.sh" 2>/dev/null || true
+chmod +x "$DEST/scripts/bibguard.py" "$DEST/install.sh" 2>/dev/null || true
 
 # Self-check: a broken copy must fail here, not on someone's bibliography.
 python3 "$DEST/tests/test_offline.py" >/dev/null 2>&1 \
@@ -50,8 +50,8 @@ python3 "$DEST/tests/test_offline.py" >/dev/null 2>&1 \
 cat <<EOF
 ✅ Installed to $DEST
 
-  python3 ${DEST/#$HOME/\~}/scripts/verify_refs.py references.bib
-  python3 ${DEST/#$HOME/\~}/scripts/verify_refs.py references.bib --fix
+  python3 ${DEST/#$HOME/\~}/scripts/bibguard.py references.bib
+  python3 ${DEST/#$HOME/\~}/scripts/bibguard.py references.bib --fix
 
 Optional, for the widest venue coverage (free key from aminer.org):
   echo 'YOUR_KEY' > ~/.claude/aminer_key && chmod 600 ~/.claude/aminer_key

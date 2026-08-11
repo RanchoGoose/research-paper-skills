@@ -1,27 +1,35 @@
 #!/usr/bin/env python3
 """
-verify_refs.py — 交叉核对 .bib 里每条引用的真实发表出处。
+bibguard.py — 写 paper 时的引用总管:加引用、查引用、统一格式。
 
-三源分工(缺一不可):
-  arXiv API       -> title / authors / 日期
-  OpenReview API2 -> ICLR / ICML / NeurIPS / COLM 录用状态(这些会议不发 DOI,
-                     Crossref 与 OpenAlex 都查不到)
-  Crossref API    -> CVPR / ICCV / ECCV / ACL / SIGGRAPH / HPCA / 期刊(有 DOI 的)
+五个源分工(以 AMiner 为主,其余补它拿不到的细节):
+  AMiner      -> 出处主源。CVPR 这类走 CMT 的会议不进 OpenReview、
+                 proceedings 出版前也没有 DOI,只有它知道这篇中了
+  arXiv API   -> title / authors / 日期。唯一权威的标题来源,能发现论文改名
+  OpenReview  -> ICLR / ICML / NeurIPS / COLM 录用状态与等级(这些会议不发 DOI,
+                 Crossref 与 OpenAlex 都查不到)
+  Crossref    -> 任何有 DOI 的,顺带把 DOI 带回来
+  doi.org     -> 按 DOI 内容协商取回权威记录,不依赖出版商
 
 用法:
-  python3 verify_refs.py references.bib                 # 全量核对 + 报告
-  python3 verify_refs.py references.bib --only k1,k2    # 只查指定 key
-  python3 verify_refs.py references.bib --refresh       # 忽略缓存重查
-  python3 verify_refs.py references.bib --json r.json   # 附带机器可读输出
+  python3 bibguard.py references.bib                    # 全量核对 + 报告
+  python3 bibguard.py references.bib --add "<标题>"      # 查证后生成并追加一条
+  python3 bibguard.py references.bib --fix              # 出处/格式写回 .bib
+  python3 bibguard.py references.bib --only k1,k2       # 只查指定 key
+  python3 bibguard.py references.bib --refresh          # 忽略缓存重查
+  python3 bibguard.py references.bib --uncited main.tex # 正文没引用的条目
 
 退出码: 0 = 全部无需改动;1 = 有条目需要处理(可当投稿前 gate)。
 缓存写在 <bib同目录>/.refcache.json,可安全重跑(API 有限流)。
+
+守门原则:查不到的绝不写进 .bib。凭空造一条看起来很像真的引用,
+正是这个工具存在要防的事。
 """
 import argparse, difflib, json, os, re, shutil, socket, sys, time
 import urllib.error, urllib.parse, urllib.request
 
-UA = os.environ.get("REFVERIFY_UA", "ref-verify/2.0 (+bibliography verification)")
-MAILTO = os.environ.get("REFVERIFY_MAILTO", "")
+UA = os.environ.get("BIBGUARD_UA", "bibguard/1.0 (+bibliography verification)")
+MAILTO = os.environ.get("BIBGUARD_MAILTO", "")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 VENUES = json.load(open(os.path.join(HERE, 'venues.json'), encoding='utf-8'))
@@ -224,22 +232,30 @@ def q_arxiv(entry):
         except Exception as e:
             if i == 3:
                 return {'err': '%s:%s' % (type(e).__name__, str(e)[:40]),
-                        'title': None, 'authors': None, 'jref': None}
+                        'title': None, 'authors': None, 'jref': None,
+                        'year': None, 'id': entry['arxiv']}
             backoff(e, i, 6)
     for e in root.findall('a:entry', NS):
         ti = ' '.join((e.find('a:title', NS).text or '').split())
-        if sim(entry['title'], ti) < 0.80:
+        # With an id and no title yet (--add by arXiv id) the id *is* the match.
+        if entry['title'] and sim(entry['title'], ti) < 0.80:
             continue
         jr = e.find('a:journal_ref', NS)
+        pub = e.find('a:published', NS)
+        idl = e.find('a:id', NS)
+        aid = re.search(r'abs/(\d{4}\.\d{4,5})', idl.text) if idl is not None else None
         return {'err': None, 'title': ti,
                 'authors': [a.find('a:name', NS).text for a in e.findall('a:author', NS)],
+                'year': (pub.text or '')[:4] if pub is not None else None,
+                'id': aid.group(1) if aid else entry['arxiv'],
                 'jref': jr.text if jr is not None else None}
     # "Not on arXiv" is an answer, not a failure -- plenty of real papers never
     # get posted (journal-only, Nature, older proceedings). Caching that as an
     # error would re-query it forever. But when the bib *gave* an id and the
     # title still does not match, that is a genuine discrepancy worth surfacing.
     return {'err': 'no-title-match' if entry['arxiv'] else 'not-on-arxiv',
-            'title': None, 'authors': None, 'jref': None}
+            'title': None, 'authors': None, 'jref': None,
+            'year': None, 'id': entry['arxiv']}
 
 
 def aminer_key():
@@ -574,6 +590,165 @@ def apply_fixes(bib_path, plan):
     return changed
 
 
+# ---------------------------------------------------------------- add entry
+def bib_author(name):
+    """arXiv gives "Xun Huang"; BibTeX wants "Huang, Xun".
+
+    Left alone if it already has a comma. Lowercase particles stay with the
+    surname ("van den Berg, Rianne"), which is the usual BibTeX convention.
+    """
+    name = ' '.join((name or '').split())
+    if not name or ',' in name:
+        return name
+    parts = name.split()
+    if len(parts) == 1:
+        return name
+    cut = len(parts) - 1
+    while cut > 1 and parts[cut - 1][:1].islower():
+        cut -= 1
+    return '%s, %s' % (' '.join(parts[cut:]), ' '.join(parts[:cut]))
+
+
+def protect_caps(title):
+    """Brace tokens BibTeX would otherwise lowercase: acronyms and CamelCase.
+
+    Without this a .bst with a lowercasing title style renders "MuKV" as
+    "Mukv" and "KV" as "Kv". Matches how the rest of the bibliography is
+    written, so a generated entry is indistinguishable from a hand-written one.
+    """
+    def odd(seg):
+        # >=2 capitals (KV, IEEE, NVFP4) or an inner capital (MuKV, LongLive)
+        return len(seg) > 1 and (sum(c.isupper() for c in seg) >= 2
+                                 or seg[1:] != seg[1:].lower())
+
+    def one(tok):
+        core = tok.strip('.,:;?!()[]')
+        if len(core) < 2 or core.startswith('{'):
+            return tok
+        # Split on hyphen and slash first: "Multi-Grained" and "Train-Test" are
+        # ordinary title case, not acronyms, and bracing them just adds noise.
+        if any(odd(seg) for seg in re.split(r'[-/]', core)):
+            return tok.replace(core, '{%s}' % core, 1)
+        return tok
+    return ' '.join(one(t) for t in title.split())
+
+
+def make_key(title, year, taken):
+    """Key in the same shape the rest of the bibliography uses: the paper's
+    short name plus its year -- selfforcing2025, mukv2026, tethercache2026."""
+    head = title.split(':')[0]
+    slug = re.sub(r'[^a-z0-9]', '', head.lower())[:20] or 'ref'
+    base = '%s%s' % (slug, year or '')
+    key, n = base, 1
+    while key in taken:
+        n += 1
+        key = '%s%s' % (base, chr(ord('a') + n - 2))
+    return key
+
+
+def render_entry(key, title, authors, year, venue_act, arxiv_id):
+    """Emit one .bib entry in the project's canonical layout."""
+    if venue_act and venue_act.get('book'):
+        typ = 'inproceedings' if venue_act['kind'] == 'conf' else 'article'
+        vfield = 'booktitle' if venue_act['kind'] == 'conf' else 'journal'
+        vvalue, note = venue_act['book'], venue_act.get('note', '')
+    else:
+        typ, vfield = 'article', 'journal'
+        vvalue = 'arXiv preprint arXiv:%s' % arxiv_id if arxiv_id else ''
+        note = ''
+    rows = [('title', protect_caps(title)),
+            ('author', ' and '.join(bib_author(a) for a in (authors or []))),
+            (vfield, vvalue), ('year', str(year or '')), ('note', note)]
+    rows = [(k, v) for k, v in rows if v]
+    w = max(len(k) for k, _ in rows)
+    body = ',\n'.join('  %-*s = {%s}' % (w, k, v) for k, v in rows)
+    return '@%s{%s,\n%s\n}\n' % (typ, key, body)
+
+
+def cmd_add(bib_path, query, am_key, use_dblp, dry_run):
+    """Look a paper up across the sources and append a verified .bib entry.
+
+    Refuses rather than guesses. Nothing is written unless at least one
+    independent source confirmed the paper exists as described -- inventing a
+    plausible-looking entry is the exact failure this tool exists to prevent.
+    """
+    q = query.strip()
+    aid = re.fullmatch(r'(?:arxiv:)?(\d{4}\.\d{4,5})(v\d+)?', q, re.I)
+    doi = re.fullmatch(r'(?:doi:)?(10\.\d{4,9}/\S+)', q, re.I)
+    stub = {'arxiv': aid.group(1) if aid else None,
+            'title': '' if (aid or doi) else q}
+
+    ax = q_arxiv(stub) if not doi else {'title': None, 'authors': None,
+                                        'year': None, 'id': None, 'err': 'skipped'}
+    dv = q_doi(doi.group(1), '') if doi else None
+    title = ax.get('title') or (dv or {}).get('title')
+    if not title:
+        print("✗ 查不到这篇:%s" % q)
+        print("  arXiv / DOI 都没有命中。换个更准确的标题,或直接给 arXiv id / DOI。")
+        print("  没有任何来源能证实的条目,不会写进 .bib —— 这正是这个工具存在的理由。")
+        return 2
+
+    authors = ax.get('authors')
+    if not authors and dv:
+        authors = dv.get('authors')
+    arxiv_id = ax.get('id')
+
+    orv = q_openreview(title)
+    cr = q_crossref(title)
+    am = q_aminer(title, am_key) if am_key else None
+    dbl = q_dblp(title) if use_dblp else None
+    st, suggest, ev = classify(orv, cr, dbl, am)
+
+    anchors = []
+    if ax.get('title'):
+        anchors.append('arXiv:' + (arxiv_id or 'title-match'))
+    if dv and dv.get('ok'):
+        anchors.append('doi:' + doi.group(1))
+    if any(x.startswith('OR:') for x in ev):
+        anchors.append('openreview')
+    if any(x.startswith(('CR:', 'DBLP:')) for x in ev):
+        anchors.append('crossref/dblp')
+    if any(x.startswith('AMINER:') for x in ev):
+        anchors.append('aminer')
+    if not anchors:
+        print("✗ 找到了标题,但没有任何独立来源能证实它:%s" % title)
+        print("  不写入。请人工核对原文后手写这一条。")
+        return 2
+
+    venue_act = pick_venue(suggest, ax.get('year'), arxiv_id) if suggest else None
+    year = (venue_act or {}).get('year') or ax.get('year') or ''
+
+    existing = parse_bib(bib_path)
+    dup = next((e for e in existing if sim(e['title'], title) >= 0.90), None)
+    if dup:
+        print("· 这篇已经在 .bib 里了:%s" % dup['key'])
+        print("  当前出处:%s" % dup['current'])
+        print("  要更新出处就跑:--only %s --fix" % dup['key'])
+        return 1
+
+    key = make_key(title, year, {e['key'] for e in existing})
+    entry = render_entry(key, title, authors, year, venue_act, arxiv_id)
+
+    print("标题  : %s" % title)
+    print("出处  : %s" % ((venue_act or {}).get('book') or
+                          ('arXiv preprint arXiv:%s' % arxiv_id if arxiv_id else '(无)')))
+    print("锚点  : %s" % ', '.join(anchors))
+    if ev:
+        print("证据  : %s" % ' || '.join(ev[:3]))
+    print("\n%s" % entry)
+    if dry_run:
+        print("(--dry-run:未写入)")
+        return 0
+
+    src = open(bib_path, encoding='utf-8').read()
+    shutil.copyfile(bib_path, bib_path + '.bak')
+    with open(bib_path, 'w', encoding='utf-8') as f:
+        f.write(src.rstrip('\n') + '\n\n' + entry)
+    print("✅ 已追加到 %s(备份 %s.bak),citation key: %s" % (bib_path, bib_path, key))
+    print("   正文里用:\\citep{%s}" % key)
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('bib')
@@ -588,6 +763,10 @@ def main():
     ap.add_argument('--no-aminer', action='store_true', help='跳过 AMiner(即使有 key)')
     ap.add_argument('--uncited', metavar='TEX',
                     help='列出 .bib 里没被这个 .tex 引用的条目(支持跨行 \\citep)')
+    ap.add_argument('--add', metavar='TITLE|ARXIV_ID|DOI',
+                    help='查证后生成一条格式正确的 bib 条目并追加(查不到就拒绝写入)')
+    ap.add_argument('--dry-run', action='store_true',
+                    help='配合 --add:只打印生成的条目,不写文件')
     a = ap.parse_args()
     globals()['EXTRA_GAP'] = a.pause
 
@@ -613,6 +792,9 @@ def main():
     use_dblp = (not a.no_dblp) and dblp_reachable()
     if not a.no_dblp and not use_dblp:
         print("· DBLP 不可达(云主机出口常被其拒绝),本轮用 arXiv+OpenReview+Crossref 三源\n")
+
+    if a.add:
+        return cmd_add(a.bib, a.add, AM_KEY, use_dblp, a.dry_run)
 
     entries = parse_bib(a.bib)
     if a.only:

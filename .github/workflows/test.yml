@@ -22,6 +22,6 @@ jobs:
         run: |
           mkdir -p /tmp/proj
           bash install.sh /tmp/proj
-          test -f /tmp/proj/.claude/skills/ref-verify/scripts/verify_refs.py
+          test -f /tmp/proj/.claude/skills/bibguard/scripts/bibguard.py
       - name: CLI runs with no arguments beyond the bib
-        run: python3 scripts/verify_refs.py tests/sample.bib --uncited tests/sample.bib || true
+        run: python3 scripts/bibguard.py tests/sample.bib --uncited tests/sample.bib || true

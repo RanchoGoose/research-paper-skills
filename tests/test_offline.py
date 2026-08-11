@@ -2,7 +2,7 @@
 """Offline tests — no network, no API key, no dependencies.
 
 Every case here is a bug that actually shipped once. Run before touching
-verify_refs.py:
+bibguard.py:
 
     python3 tests/test_offline.py
 """
@@ -11,7 +11,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), 'scripts'))
-import verify_refs as V                                       # noqa: E402
+import bibguard as V                                       # noqa: E402
 
 FAIL = []
 
@@ -155,6 +155,47 @@ check("same paper, punctuation differs",
             'Self-Forcing: Bridging the Train Test Gap') > 0.80, True)
 check("different paper", V.sim('Attention Is All You Need',
                                'Diffusion Models Beat GANs') > 0.80, False)
+
+section("--add: bib_author — arXiv gives 'First Last', BibTeX wants 'Last, First'")
+check("plain name", V.bib_author('Xun Huang'), 'Huang, Xun')
+check("middle name", V.bib_author('Song Han Lee'), 'Lee, Song Han')
+check("lowercase particle", V.bib_author('Rianne van den Berg'),
+      'van den Berg, Rianne')
+check("already inverted", V.bib_author('Huang, Xun'), 'Huang, Xun')
+check("mononym", V.bib_author('Plato'), 'Plato')
+
+section("--add: protect_caps — an unbraced acronym renders as 'Mukv'")
+check("acronym braced", V.protect_caps('MuKV: Multi-Grained KV Cache'),
+      '{MuKV}: Multi-Grained {KV} Cache')
+check("camel case braced", V.protect_caps('LongLive is real-time'),
+      '{LongLive} is real-time')
+check("ordinary words untouched", V.protect_caps('Attention is all you need'),
+      'Attention is all you need')
+
+section("--add: make_key — same shape as the rest of the bibliography")
+check("head before colon + year",
+      V.make_key('Self Forcing: Bridging the Train-Test Gap', '2025', set()),
+      'selfforcing2025')
+check("acronym title", V.make_key('MuKV: Multi-Grained KV', '2026', set()), 'mukv2026')
+check("collision gets a suffix",
+      V.make_key('MuKV: Multi-Grained KV', '2026', {'mukv2026'}), 'mukv2026a')
+
+section("--add: render_entry — canonical layout, nothing invented")
+e = V.render_entry('longlive2026', 'LongLive: Real-time Interactive Long Video Generation',
+                   ['Shuai Yang', 'Yukang Chen'], '2026',
+                   {'kind': 'conf', 'book': 'Proceedings of the International Conference on '
+                                            'Learning Representations (ICLR)',
+                    'note': 'Poster; arXiv:2509.22622'}, '2509.22622')
+check("conference -> @inproceedings", e.startswith('@inproceedings{longlive2026,'), True)
+check("uses booktitle", '  booktitle = {Proceedings of the International Conference' in e, True)
+check("authors inverted and joined", 'Yang, Shuai and Chen, Yukang' in e, True)
+check("acronym protected", '{LongLive}' in e, True)
+check("note carried", 'note      = {Poster; arXiv:2509.22622}' in e, True)
+# No venue found: it must stay an honest preprint rather than guess one.
+p = V.render_entry('foo2026', 'Foo Bar', ['A B'], '2026', None, '2601.00001')
+check("no venue -> @article + arXiv", p.startswith('@article{foo2026,'), True)
+check("journal is the arXiv line", 'journal = {arXiv preprint arXiv:2601.00001}' in p, True)
+check("no empty fields emitted", '{}' in p, False)
 
 section("short_query — OpenReview ranks badly on very long terms")
 # The 12-word cap is the fix: a full 20-word title returns records with

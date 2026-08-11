@@ -1,6 +1,8 @@
-# ref-verify
+# bibguard
 
-**Check that every paper in your `.bib` actually exists, find where it was really published, and make the whole bibliography use one format.**
+**Your `.bib`, guarded.** Add a citation and it gets verified before it is written.
+Check the ones already there, find where each was really published, and make the
+whole bibliography use one format.
 
 One Python file, standard library only. No `pip install`, no API key required.
 Works as a plain CLI, as a pre-submission CI gate, or as a [Claude Code](https://claude.com/claude-code) skill.
@@ -19,23 +21,25 @@ Three things go wrong in a bibliography, and they fail in different ways:
 | **The venue is wrong** | You cited the arXiv preprint. It has since been published at NeurIPS. Or it was renamed, and your title is the old one. |
 | **The format is inconsistent** | Half the entries say `CVPR 2025`, half say `Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition`, one says `In Proceedings of...` and renders as "In In". |
 
-`ref-verify` does all three in one pass, and — the part that matters most — it
-tells you **which entries it could not verify**, instead of quietly reporting
-them as fine.
+`bibguard` handles all three, and — the part that matters most — it tells you
+**which entries it could not verify**, instead of quietly reporting them as fine.
+
+The name is the design: nothing gets into your bibliography that no source could
+confirm. `--add` will refuse to write an entry rather than invent a plausible one.
 
 ## Install
 
 ```bash
-git clone https://github.com/RanchoGoose/ref-verify.git
-cd ref-verify
-bash install.sh --user            # → ~/.claude/skills/ref-verify (all projects)
+git clone https://github.com/RanchoGoose/bibguard.git
+cd bibguard
+bash install.sh --user            # → ~/.claude/skills/bibguard (all projects)
 bash install.sh /path/to/paper    # → that project's .claude/skills/
 ```
 
 Or just run it in place — it is one self-contained script:
 
 ```bash
-python3 scripts/verify_refs.py references.bib
+python3 scripts/bibguard.py references.bib
 ```
 
 Requires Python 3.7+. Nothing else.
@@ -43,8 +47,10 @@ Requires Python 3.7+. Nothing else.
 ## Use
 
 ```bash
-S=scripts/verify_refs.py
+S=scripts/bibguard.py
 
+python3 $S references.bib --add "Attention Is All You Need"   # verify, then append
+python3 $S references.bib --add 2506.08009                    # arXiv id or DOI works too
 python3 $S references.bib                 # report (uses cache, safe to re-run)
 python3 $S references.bib --fix           # write venues + uniform format back (.bak first)
 python3 $S references.bib --only k1,k2    # just these keys
@@ -57,11 +63,54 @@ python3 $S references.bib --pause 2       # go slower if you are being rate-limi
 **Exit code 0 = nothing to do, 1 = something needs attention.** Drop it in CI:
 
 ```yaml
-- run: python3 scripts/verify_refs.py references.bib --refresh
+- run: python3 scripts/bibguard.py references.bib --refresh
 ```
 
 Results are cached in `.refcache.json` next to the `.bib`, so an interrupted run
 resumes without re-querying. Add it to `.gitignore`.
+
+## Adding a citation
+
+Give it a title, an arXiv id, or a DOI. It verifies the paper first, then writes
+the entry:
+
+```
+$ python3 scripts/bibguard.py references.bib --add "LongLive: Real-time Interactive Long Video Generation"
+
+标题  : LongLive: Real-time Interactive Long Video Generation
+出处  : Proceedings of the International Conference on Learning Representations (ICLR)
+锚点  : arXiv:2509.22622, openreview, aminer
+
+@inproceedings{longlive2026,
+  title     = {{LongLive}: Real-time Interactive Long Video Generation},
+  author    = {Yang, Shuai and Huang, Wei and ... and Chen, Yukang},
+  booktitle = {Proceedings of the International Conference on Learning Representations (ICLR)},
+  year      = {2026},
+  note      = {Poster; arXiv:2509.22622}
+}
+```
+
+It handles the details that are easy to get wrong by hand:
+
+- **Author names inverted** to BibTeX's `Last, First`, with lowercase particles
+  kept on the surname (`van den Berg, Rianne`).
+- **Acronyms braced** — `{MuKV}`, `{KV}`, `{NVFP4}` — or a lowercasing `.bst`
+  renders "MuKV" as "Mukv". Hyphenated title case (`Multi-Grained`, `Train-Test`)
+  is left alone.
+- **Citation key in your bibliography's own shape**: the short name before the
+  colon plus the year, `longlive2026`. Collisions get a suffix.
+- **Title, authors and year come from the authoritative record**, not from what
+  you typed — the name you know a paper by is often its old one.
+
+And three cases where it refuses to write, which is the whole point of the name:
+
+| Situation | What happens |
+|---|---|
+| The paper cannot be found | ✗ Refused. **It will not invent a plausible entry.** |
+| Found, but no independent anchor | ✗ Refused; check the paper yourself and write it by hand. |
+| Already in your `.bib` | · Tells you the existing key and how to update its venue instead. |
+
+`--dry-run` prints without writing. A `.bak` is saved before any write.
 
 ## What it reports
 
@@ -163,7 +212,7 @@ annotations are merged, not replaced — no API can give them back to you.
 pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 grep -cE '^!' main.log                        # LaTeX errors — must be 0
 grep -c 'Citation.*undefined' main.log        # undefined citations — must be 0
-python3 scripts/verify_refs.py references.bib --uncited main.tex
+python3 scripts/bibguard.py references.bib --uncited main.tex
 ```
 
 ⚠️ **Do not grep for uncited entries.** `\citep{a,b,%` continued across lines is
@@ -257,22 +306,22 @@ home or campus connection it enables itself.
 ## 装
 
 ```bash
-git clone https://github.com/RanchoGoose/ref-verify.git
-cd ref-verify
-bash install.sh --user            # → ~/.claude/skills/ref-verify(全局)
+git clone https://github.com/RanchoGoose/bibguard.git
+cd bibguard
+bash install.sh --user            # → ~/.claude/skills/bibguard(全局)
 bash install.sh /path/to/paper    # → 装到某个项目
 ```
 
 或者直接跑,它就是一个自包含脚本:
 
 ```bash
-python3 scripts/verify_refs.py references.bib
+python3 scripts/bibguard.py references.bib
 ```
 
 ## 用
 
 ```bash
-S=scripts/verify_refs.py
+S=scripts/bibguard.py
 
 python3 $S references.bib                 # 核对 + 报告(读缓存,可安全重跑)
 python3 $S references.bib --fix           # 把出处和统一格式写回 .bib(先存 .bak)
@@ -282,6 +331,32 @@ python3 $S references.bib --uncited main.tex   # 列出正文没引用的条目
 ```
 
 退出码 **0 = 无需改动,1 = 有条目待处理**,可直接当投稿前 gate。
+
+## 加一条引用：`--add`
+
+给标题、arXiv id 或 DOI 都行。它会先把这篇论文查证一遍，再生成条目：
+
+```bash
+python3 scripts/bibguard.py references.bib --add "LongLive: Real-time Interactive Long Video Generation"
+```
+
+生成时自动处理掉几个手写必错的细节：
+
+- **作者名反转**成 BibTeX 要的 `Last, First`，小写介词跟着姓走（`van den Berg, Rianne`）。
+- **缩写加花括号**：`{MuKV}` / `{KV}` / `{NVFP4}`，否则某些 `.bst` 会渲染成 `Mukv`。
+  连字符词按普通标题大小写处理，`Multi-Grained` 不会被多余地括起来。
+- **citation key** 跟全篇同一套写法：标题冒号前的短名 + 年份 → `longlive2026`。
+- **标题、作者、年份全部取自权威记录**，不用你提供的那一版（你给的可能是旧名）。
+
+三种它会**拒绝写入**的情况——这就是 guard 的意思：
+
+| 情况 | 行为 |
+|---|---|
+| 查不到这篇 | ✗ 拒绝。**绝不编一条看起来很像真的** |
+| 查到标题但没有任何独立锚点 | ✗ 拒绝，要求人工核原文后手写 |
+| 这篇已经在 .bib 里了 | · 提示已存在的 key，并告诉你用 `--only <key> --fix` 更新出处 |
+
+`--dry-run` 只打印不写文件。写入前自动存 `.bak`。
 
 ## 最关键的设计:分清「验过了」和「没验成」
 
@@ -333,7 +408,7 @@ CVPR 2024,也有 TPAMI 记录)。只有当前写着 arXiv 时才去建议列表�
 pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 grep -cE '^!' main.log                        # LaTeX 错误,须 0
 grep -c 'Citation.*undefined' main.log        # 未定义引用,须 0
-python3 scripts/verify_refs.py references.bib --uncited main.tex
+python3 scripts/bibguard.py references.bib --uncited main.tex
 ```
 
 ⚠️ **不要用 grep 查未引用条目。** `\citep{a,b,%` 换行续写的引用是跨行的,
