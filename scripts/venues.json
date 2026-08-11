@@ -1,0 +1,247 @@
+{
+ "_comment": "Canonical venue names. Key = uppercase abbreviation. 'book' is what goes in booktitle/journal; the .bst supplies the leading 'In', so book must NOT start with 'In'. 'kind' picks the bib entry type: conf -> @inproceedings, jour -> @article.",
+ "NEURIPS": {
+  "kind": "conf",
+  "book": "Proceedings of the Conference on Neural Information Processing Systems (NeurIPS)",
+  "match": [
+   "neurips",
+   "nips",
+   "advances in neural information processing",
+   "conference on neural information processing systems"
+  ]
+ },
+ "ICLR": {
+  "kind": "conf",
+  "book": "Proceedings of the International Conference on Learning Representations (ICLR)",
+  "match": [
+   "iclr",
+   "international conference on learning representations"
+  ]
+ },
+ "ICML": {
+  "kind": "conf",
+  "book": "Proceedings of the International Conference on Machine Learning (ICML)",
+  "match": [
+   "icml",
+   "international conference on machine learning"
+  ]
+ },
+ "COLM": {
+  "kind": "conf",
+  "book": "Proceedings of the Conference on Language Modeling (COLM)",
+  "match": [
+   "colm",
+   "conference on language modeling"
+  ]
+ },
+ "CVPR": {
+  "kind": "conf",
+  "book": "Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)",
+  "match": [
+   "cvpr",
+   "computer vision and pattern recognition",
+   "conference on computer vision and pattern recognition"
+  ]
+ },
+ "ICCV": {
+  "kind": "conf",
+  "book": "Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV)",
+  "match": [
+   "iccv",
+   "international conference on computer vision"
+  ]
+ },
+ "ECCV": {
+  "kind": "conf",
+  "book": "Proceedings of the European Conference on Computer Vision (ECCV)",
+  "match": [
+   "eccv",
+   "european conference on computer vision"
+  ]
+ },
+ "WACV": {
+  "kind": "conf",
+  "book": "Proceedings of the IEEE/CVF Winter Conference on Applications of Computer Vision (WACV)",
+  "match": [
+   "wacv",
+   "winter conference on applications"
+  ]
+ },
+ "BMVC": {
+  "kind": "conf",
+  "book": "Proceedings of the British Machine Vision Conference (BMVC)",
+  "match": [
+   "bmvc",
+   "british machine vision"
+  ]
+ },
+ "SIGGRAPH": {
+  "kind": "conf",
+  "book": "Proceedings of ACM SIGGRAPH",
+  "match": [
+   "siggraph"
+  ]
+ },
+ "ACL": {
+  "kind": "conf",
+  "book": "Proceedings of the Annual Meeting of the Association for Computational Linguistics (ACL)",
+  "match": [
+   "acl",
+   "annual meeting of the association for computational linguistics"
+  ]
+ },
+ "EMNLP": {
+  "kind": "conf",
+  "book": "Proceedings of the Conference on Empirical Methods in Natural Language Processing (EMNLP)",
+  "match": [
+   "emnlp",
+   "empirical methods in natural language"
+  ]
+ },
+ "NAACL": {
+  "kind": "conf",
+  "book": "Proceedings of the Conference of the North American Chapter of the Association for Computational Linguistics (NAACL)",
+  "match": [
+   "naacl",
+   "north american chapter"
+  ]
+ },
+ "COLING": {
+  "kind": "conf",
+  "book": "Proceedings of the International Conference on Computational Linguistics (COLING)",
+  "match": [
+   "coling"
+  ]
+ },
+ "AAAI": {
+  "kind": "conf",
+  "book": "Proceedings of the AAAI Conference on Artificial Intelligence (AAAI)",
+  "match": [
+   "aaai"
+  ]
+ },
+ "IJCAI": {
+  "kind": "conf",
+  "book": "Proceedings of the International Joint Conference on Artificial Intelligence (IJCAI)",
+  "match": [
+   "ijcai"
+  ]
+ },
+ "HPCA": {
+  "kind": "conf",
+  "book": "Proceedings of the IEEE International Symposium on High-Performance Computer Architecture (HPCA)",
+  "match": [
+   "hpca",
+   "high performance computer architecture",
+   "high-performance computer architecture"
+  ]
+ },
+ "ISCA": {
+  "kind": "conf",
+  "book": "Proceedings of the ACM/IEEE International Symposium on Computer Architecture (ISCA)",
+  "match": [
+   "isca",
+   "international symposium on computer architecture"
+  ]
+ },
+ "MICRO": {
+  "kind": "conf",
+  "book": "Proceedings of the IEEE/ACM International Symposium on Microarchitecture (MICRO)",
+  "match": [
+   "micro",
+   "international symposium on microarchitecture"
+  ]
+ },
+ "ASPLOS": {
+  "kind": "conf",
+  "book": "Proceedings of the International Conference on Architectural Support for Programming Languages and Operating Systems (ASPLOS)",
+  "match": [
+   "asplos",
+   "architectural support for programming languages"
+  ]
+ },
+ "OSDI": {
+  "kind": "conf",
+  "book": "Proceedings of the USENIX Symposium on Operating Systems Design and Implementation (OSDI)",
+  "match": [
+   "osdi",
+   "operating systems design and implementation"
+  ]
+ },
+ "SOSP": {
+  "kind": "conf",
+  "book": "Proceedings of the ACM Symposium on Operating Systems Principles (SOSP)",
+  "match": [
+   "sosp",
+   "symposium on operating systems principles"
+  ]
+ },
+ "NSDI": {
+  "kind": "conf",
+  "book": "Proceedings of the USENIX Symposium on Networked Systems Design and Implementation (NSDI)",
+  "match": [
+   "nsdi",
+   "networked systems design"
+  ]
+ },
+ "MLSYS": {
+  "kind": "conf",
+  "book": "Proceedings of the Conference on Machine Learning and Systems (MLSys)",
+  "match": [
+   "mlsys",
+   "machine learning and systems"
+  ]
+ },
+ "TPAMI": {
+  "kind": "jour",
+  "book": "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+  "match": [
+   "pattern analysis and machine intelligence",
+   "tpami"
+  ]
+ },
+ "TIP": {
+  "kind": "jour",
+  "book": "IEEE Transactions on Image Processing",
+  "match": [
+   "transactions on image processing"
+  ]
+ },
+ "TOG": {
+  "kind": "jour",
+  "book": "ACM Transactions on Graphics",
+  "match": [
+   "transactions on graphics"
+  ]
+ },
+ "JMLR": {
+  "kind": "jour",
+  "book": "Journal of Machine Learning Research",
+  "match": [
+   "journal of machine learning research",
+   "jmlr"
+  ]
+ },
+ "TMLR": {
+  "kind": "jour",
+  "book": "Transactions on Machine Learning Research",
+  "match": [
+   "transactions on machine learning research",
+   "tmlr"
+  ]
+ },
+ "NATURE": {
+  "kind": "jour",
+  "book": "Nature",
+  "match": [
+   "nature"
+  ]
+ },
+ "SCIENCE": {
+  "kind": "jour",
+  "book": "Science",
+  "match": [
+   "science"
+  ]
+ }
+}

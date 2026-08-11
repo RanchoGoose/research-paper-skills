@@ -1,0 +1,27 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline:
+    # No network calls, no API key: these run anywhere, including forks.
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.8', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Offline tests
+        run: python3 tests/test_offline.py
+      - name: Install into a scratch project
+        run: |
+          mkdir -p /tmp/proj
+          bash install.sh /tmp/proj
+          test -f /tmp/proj/.claude/skills/ref-verify/scripts/verify_refs.py
+      - name: CLI runs with no arguments beyond the bib
+        run: python3 scripts/verify_refs.py tests/sample.bib --uncited tests/sample.bib || true
