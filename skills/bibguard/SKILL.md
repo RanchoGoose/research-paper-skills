@@ -11,8 +11,10 @@ description: 写 paper 时所有 reference 与 citation 的唯一入口——新
 
 一个 skill 管四件事:**① 加引用 ② 这篇论文真的存在吗 ③ 它到底发在哪 ④ 全篇格式统一**。
 
+Resolve this installed skill's own directory first; do not assume a Claude- or Codex-specific install path. In the examples below, `S` is the absolute path to this skill's `scripts/bibguard.py`:
+
 ```bash
-S=.claude/skills/bibguard/scripts/bibguard.py
+S=/absolute/path/to/bibguard/scripts/bibguard.py
 
 python3 $S references.bib --add "<论文标题>"    # 查证后生成并追加一条(查不到就拒绝)
 python3 $S references.bib --add 2506.08009     # 也能直接给 arXiv id 或 DOI
@@ -28,7 +30,7 @@ python3 $S references.bib --pause 2            # 限流严重时在每个源的�
 退出码 **0 = 无需改动;1 = 有条目待处理**,可直接当投稿前 gate。
 缓存在 `.refcache.json`(与 .bib 同目录,记得 gitignore),中断重跑不会重复请求。
 
-改脚本前先跑 `python3 tests/test_offline.py`(纯离线,不联网)。
+改脚本前先跑 `python3 /absolute/path/to/bibguard/tests/test_offline.py`（纯离线，不联网）。
 
 ## 加一条引用:`--add`
 
@@ -247,9 +249,9 @@ python3 $S references.bib --uncited main.tex   # bib 里没被正文引用的条
 ## 装到别的项目 / 分享给别人
 
 ```bash
-bash install.sh /path/to/other-project   # 装到某个项目
-bash install.sh --user                   # 装到 ~/.claude/skills(全局可用)
+npx skills add RanchoGoose/research-paper-skills --skill bibguard -g -a codex -y
+npx skills add RanchoGoose/research-paper-skills --skill bibguard -g -a claude-code -y
 ```
 
-只依赖 Python 3 标准库,无需 pip、无需 API key。
-公开仓库:https://github.com/RanchoGoose/bibguard
+只依赖 Python 3 标准库，无需 pip、无需 API key。
+公开仓库：https://github.com/RanchoGoose/research-paper-skills

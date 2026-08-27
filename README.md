@@ -1,17 +1,46 @@
-# bibguard
+# Research Paper Skills
 
-**Your `.bib`, guarded.** Add a citation and it gets verified before it is written.
-Check the ones already there, find where each was really published, and make the
-whole bibliography use one format.
+Two independent Agent Skills for research-paper quality control:
 
-One Python file, standard library only. No `pip install`, no API key required.
-Works as a plain CLI, as a pre-submission CI gate, or as a [Claude Code](https://claude.com/claude-code) skill.
+| Skill | Purpose |
+|---|---|
+| **bibguard** | Verify that citations exist, recover the real publication venue, add safe BibTeX entries, normalize bibliography format, and find uncited entries. |
+| **iclr-paper-review** | Perform strict ICLR-style review with semantic novelty analysis, claim-to-evidence tracing, abstract and main-text audits, per-figure/table review, writing/citation logic, and calibrated 1–10 scoring. |
+
+Each skill is self-contained under [`skills/`](skills/) and can be installed separately. They do not invoke or depend on each other.
 
 [中文说明](#中文) ·  [MIT](LICENSE)
 
 ---
 
-## Why
+## One-command install
+
+Install both skills globally for Codex:
+
+```bash
+npx skills add RanchoGoose/research-paper-skills --skill '*' -g -a codex -y
+```
+
+Install only one skill:
+
+```bash
+npx skills add RanchoGoose/research-paper-skills --skill bibguard -g -a codex -y
+npx skills add RanchoGoose/research-paper-skills --skill iclr-paper-review -g -a codex -y
+```
+
+The same repository works with other supported agents; for example, replace `codex` with `claude-code`. To inspect the available skills before installing:
+
+```bash
+npx skills add RanchoGoose/research-paper-skills --list
+```
+
+## BibGuard
+
+**Your `.bib`, guarded.** Add a citation and it gets verified before it is written. Check existing citations, recover where each was really published, and make the bibliography use one format.
+
+The BibGuard CLI is one Python file using only the standard library. No `pip install` or API key is required.
+
+### Why BibGuard
 
 Three things go wrong in a bibliography, and they fail in different ways:
 
@@ -27,19 +56,19 @@ Three things go wrong in a bibliography, and they fail in different ways:
 The name is the design: nothing gets into your bibliography that no source could
 confirm. `--add` will refuse to write an entry rather than invent a plausible one.
 
-## Install
+### Manual install or run in place
 
 ```bash
-git clone https://github.com/RanchoGoose/bibguard.git
-cd bibguard
-bash install.sh --user            # → ~/.claude/skills/bibguard (all projects)
-bash install.sh /path/to/paper    # → that project's .claude/skills/
+git clone https://github.com/RanchoGoose/research-paper-skills.git
+cd research-paper-skills
+bash install.sh bibguard --claude --user
+bash install.sh bibguard --claude /path/to/paper
 ```
 
 Or just run it in place — it is one self-contained script:
 
 ```bash
-python3 scripts/bibguard.py references.bib
+python3 skills/bibguard/scripts/bibguard.py references.bib
 ```
 
 Requires Python 3.7+. Nothing else.
@@ -47,7 +76,7 @@ Requires Python 3.7+. Nothing else.
 ## Use
 
 ```bash
-S=scripts/bibguard.py
+S=skills/bibguard/scripts/bibguard.py
 
 python3 $S references.bib --add "Attention Is All You Need"   # verify, then append
 python3 $S references.bib --add 2506.08009                    # arXiv id or DOI works too
@@ -63,7 +92,7 @@ python3 $S references.bib --pause 2       # go slower if you are being rate-limi
 **Exit code 0 = nothing to do, 1 = something needs attention.** Drop it in CI:
 
 ```yaml
-- run: python3 scripts/bibguard.py references.bib --refresh
+- run: python3 skills/bibguard/scripts/bibguard.py references.bib --refresh
 ```
 
 Results are cached in `.refcache.json` next to the `.bib`, so an interrupted run
@@ -75,7 +104,7 @@ Give it a title, an arXiv id, or a DOI. It verifies the paper first, then writes
 the entry:
 
 ```
-$ python3 scripts/bibguard.py references.bib --add "LongLive: Real-time Interactive Long Video Generation"
+$ python3 skills/bibguard/scripts/bibguard.py references.bib --add "LongLive: Real-time Interactive Long Video Generation"
 
 标题  : LongLive: Real-time Interactive Long Video Generation
 出处  : Proceedings of the International Conference on Learning Representations (ICLR)
@@ -212,7 +241,7 @@ annotations are merged, not replaced — no API can give them back to you.
 pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 grep -cE '^!' main.log                        # LaTeX errors — must be 0
 grep -c 'Citation.*undefined' main.log        # undefined citations — must be 0
-python3 scripts/bibguard.py references.bib --uncited main.tex
+python3 skills/bibguard/scripts/bibguard.py references.bib --uncited main.tex
 ```
 
 ⚠️ **Do not grep for uncited entries.** `\citep{a,b,%` continued across lines is
@@ -223,7 +252,7 @@ across lines.
 ## Tests
 
 ```bash
-python3 tests/test_offline.py     # no network required
+python3 skills/bibguard/tests/test_offline.py     # no network required
 ```
 
 ## Notes from actually using this
@@ -281,16 +310,51 @@ Conclusion: **DBLP blocks datacenter IP ranges.** The script probes once per run
 and falls through silently rather than burning a timeout on every entry. On a
 home or campus connection it enables itself.
 
+## ICLR Paper Review
+
+`iclr-paper-review` reviews a machine-learning paper as a complete scientific argument rather than a collection of keywords or benchmark numbers. It includes:
+
+- semantic novelty analysis against the closest conceptual alternatives;
+- a claim-to-evidence ledger across the main text and appendix;
+- a strict abstract audit for clarity, concision, whole-paper coverage, and detail control;
+- a main-text self-containment gate and individual audit of every figure and table;
+- writing, terminology, definition, citation, and narrative-logic review;
+- insight, field impact, workload, completeness, and contribution-versus-defect judgment;
+- one calibrated 1–10 ICLR score, with 8 reserved for Strong Accept;
+- an optional, explicitly authorized iterative Git/Overleaf review loop.
+
+Invoke it after installation with a request such as:
+
+```text
+Use $iclr-paper-review to review this paper and supplementary material, audit every main-text figure and table, and give one calibrated ICLR score.
+```
+
+The full rubric and specialized audit procedures live under [`skills/iclr-paper-review/references/`](skills/iclr-paper-review/references/).
+
 ---
 
 <a name="中文"></a>
 
 # 中文说明
 
+本仓库包含两个相互独立的论文质量技能：
+
+- **bibguard**：核实引用是否真实存在、查找正式出处、生成与统一 BibTeX，并检查未引用条目。
+- **iclr-paper-review**：按照严格 ICLR 标准审查创新、证据、摘要、正文图表、写作引用、工作完整性，并给出单一 1–10 分。
+
+一键安装到 Codex：
+
+```bash
+npx skills add RanchoGoose/research-paper-skills --skill '*' -g -a codex -y
+```
+
+也可以把 `--skill '*'` 换成 `--skill bibguard` 或 `--skill iclr-paper-review`，只安装其中一个。
+
+## BibGuard 中文说明
+
 **核实 `.bib` 里每篇论文真实存在、查出它真正发表在哪、并把全篇引用格式统一。**
 
-一个 Python 文件,只用标准库。不装 pip 包,不需要 API key。
-可以当命令行工具、当投稿前的 CI gate,也可以当 [Claude Code](https://claude.com/claude-code) 的 skill。
+BibGuard 是一个只依赖 Python 标准库的 CLI 与 skill。不装 pip 包，不需要 API key。
 
 ## 解决三件事
 
@@ -306,22 +370,22 @@ home or campus connection it enables itself.
 ## 装
 
 ```bash
-git clone https://github.com/RanchoGoose/bibguard.git
-cd bibguard
-bash install.sh --user            # → ~/.claude/skills/bibguard(全局)
-bash install.sh /path/to/paper    # → 装到某个项目
+git clone https://github.com/RanchoGoose/research-paper-skills.git
+cd research-paper-skills
+bash install.sh bibguard --claude --user
+bash install.sh bibguard --claude /path/to/paper
 ```
 
 或者直接跑,它就是一个自包含脚本:
 
 ```bash
-python3 scripts/bibguard.py references.bib
+python3 skills/bibguard/scripts/bibguard.py references.bib
 ```
 
 ## 用
 
 ```bash
-S=scripts/bibguard.py
+S=skills/bibguard/scripts/bibguard.py
 
 python3 $S references.bib                 # 核对 + 报告(读缓存,可安全重跑)
 python3 $S references.bib --fix           # 把出处和统一格式写回 .bib(先存 .bak)
@@ -337,7 +401,7 @@ python3 $S references.bib --uncited main.tex   # 列出正文没引用的条目
 给标题、arXiv id 或 DOI 都行。它会先把这篇论文查证一遍，再生成条目：
 
 ```bash
-python3 scripts/bibguard.py references.bib --add "LongLive: Real-time Interactive Long Video Generation"
+python3 skills/bibguard/scripts/bibguard.py references.bib --add "LongLive: Real-time Interactive Long Video Generation"
 ```
 
 生成时自动处理掉几个手写必错的细节：
@@ -408,7 +472,7 @@ CVPR 2024,也有 TPAMI 记录)。只有当前写着 arXiv 时才去建议列表�
 pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 grep -cE '^!' main.log                        # LaTeX 错误,须 0
 grep -c 'Citation.*undefined' main.log        # 未定义引用,须 0
-python3 scripts/bibguard.py references.bib --uncited main.tex
+python3 skills/bibguard/scripts/bibguard.py references.bib --uncited main.tex
 ```
 
 ⚠️ **不要用 grep 查未引用条目。** `\citep{a,b,%` 换行续写的引用是跨行的,

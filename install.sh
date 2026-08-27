@@ -1,60 +1,90 @@
 #!/usr/bin/env bash
-# Install bibguard as a Claude Code skill, into one project or globally.
+# Install one or both independent research-paper skills.
 #
-#   bash install.sh /path/to/project   # -> that project's .claude/skills/
-#   bash install.sh --user             # -> ~/.claude/skills/ (every project)
-#   bash install.sh                    # no argument = --user
-#
-# Python 3 standard library only: no pip packages, no API key required.
+#   bash install.sh                              # both, Codex, global
+#   bash install.sh bibguard --codex --user
+#   bash install.sh iclr-paper-review --claude /path/to/project
+#   bash install.sh all --claude --user
 set -euo pipefail
 
-SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NAME=bibguard
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELECTED=all
+AGENT=codex
+PROJECT_DIR=""
 
-case "${1:---user}" in
-  --user) DEST="$HOME/.claude/skills/$NAME" ;;
-  -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
-  *)
-    [ -d "$1" ] || { echo "No such directory: $1" >&2; exit 1; }
-    DEST="$(cd "$1" && pwd)/.claude/skills/$NAME"
-    ;;
-esac
+usage() {
+  sed -n '2,7p' "$0"
+  cat <<'EOF'
 
-if [ "$SRC" = "$DEST" ]; then
-  echo "Source and destination are the same directory; nothing to do."; exit 0
+Skills:  bibguard | iclr-paper-review | all
+Agents:  --codex (default) | --claude
+Scope:   --user (default) | /path/to/project
+EOF
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    bibguard|iclr-paper-review|all) SELECTED="$arg" ;;
+    --all) SELECTED=all ;;
+    --codex) AGENT=codex ;;
+    --claude) AGENT=claude ;;
+    --user) PROJECT_DIR="" ;;
+    -h|--help) usage; exit 0 ;;
+    -*) echo "Unknown option: $arg" >&2; usage >&2; exit 2 ;;
+    *)
+      [ -d "$arg" ] || { echo "No such directory: $arg" >&2; exit 1; }
+      PROJECT_DIR="$(cd "$arg" && pwd)"
+      ;;
+  esac
+done
+
+if [ "$AGENT" = codex ]; then
+  if [ -n "$PROJECT_DIR" ]; then
+    DEST_ROOT="$PROJECT_DIR/.codex/skills"
+  else
+    DEST_ROOT="${CODEX_HOME:-$HOME/.codex}/skills"
+  fi
+else
+  if [ -n "$PROJECT_DIR" ]; then
+    DEST_ROOT="$PROJECT_DIR/.claude/skills"
+  else
+    DEST_ROOT="$HOME/.claude/skills"
+  fi
 fi
 
-command -v python3 >/dev/null || { echo "python3 is required" >&2; exit 1; }
-
-mkdir -p "$(dirname "$DEST")"
-if [ -d "$DEST" ]; then
-  echo "· Already installed; backing up to $DEST.bak"
-  rm -rf "$DEST.bak"; mv "$DEST" "$DEST.bak"
+if [ "$SELECTED" = all ]; then
+  SKILLS="bibguard iclr-paper-review"
+else
+  SKILLS="$SELECTED"
 fi
 
-mkdir -p "$DEST/scripts" "$DEST/tests"
-for f in SKILL.md README.md LICENSE install.sh; do
-  [ -f "$SRC/$f" ] && cp "$SRC/$f" "$DEST/"
-done
-cp "$SRC/scripts/bibguard.py" "$SRC/scripts/venues.json" "$DEST/scripts/"
-for f in test_offline.py sample.bib; do
-  [ -f "$SRC/tests/$f" ] && cp "$SRC/tests/$f" "$DEST/tests/"
-done
-chmod +x "$DEST/scripts/bibguard.py" "$DEST/install.sh" 2>/dev/null || true
+mkdir -p "$DEST_ROOT"
 
-# Self-check: a broken copy must fail here, not on someone's bibliography.
-python3 "$DEST/tests/test_offline.py" >/dev/null 2>&1 \
-  && echo "· self-check: offline tests pass" \
-  || { echo "· self-check FAILED — run: python3 $DEST/tests/test_offline.py" >&2; exit 1; }
+for skill_name in $SKILLS; do
+  source_dir="$REPO_ROOT/skills/$skill_name"
+  destination="$DEST_ROOT/$skill_name"
+  [ -f "$source_dir/SKILL.md" ] || { echo "Invalid skill source: $source_dir" >&2; exit 1; }
+
+  if [ -e "$destination" ]; then
+    backup_path="$destination.bak.$(date +%Y%m%d%H%M%S)"
+    echo "· Backing up existing $skill_name to $backup_path"
+    mv "$destination" "$backup_path"
+  fi
+
+  cp -R "$source_dir" "$destination"
+  [ -f "$destination/scripts/bibguard.py" ] && chmod +x "$destination/scripts/bibguard.py"
+
+  if [ "$skill_name" = bibguard ]; then
+    command -v python3 >/dev/null || { echo "python3 is required for bibguard" >&2; exit 1; }
+    python3 "$destination/tests/test_offline.py" >/dev/null
+    echo "· bibguard offline self-check passed"
+  fi
+
+  echo "✅ Installed $skill_name to $destination"
+done
 
 cat <<EOF
-✅ Installed to $DEST
 
-  python3 ${DEST/#$HOME/\~}/scripts/bibguard.py references.bib
-  python3 ${DEST/#$HOME/\~}/scripts/bibguard.py references.bib --fix
-
-Optional, for the widest venue coverage (free key from aminer.org):
-  echo 'YOUR_KEY' > ~/.claude/aminer_key && chmod 600 ~/.claude/aminer_key
-
-Add .refcache.json to .gitignore (it is written next to your .bib).
+Invoke the skills as \$bibguard or \$iclr-paper-review in a supported agent.
+BibGuard CLI: python3 $DEST_ROOT/bibguard/scripts/bibguard.py references.bib
 EOF

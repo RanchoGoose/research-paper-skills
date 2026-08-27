@@ -16,12 +16,23 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Validate independent skill layout
+        run: python3 tests/test_skill_layout.py
       - name: Offline tests
-        run: python3 tests/test_offline.py
-      - name: Install into a scratch project
+        run: python3 skills/bibguard/tests/test_offline.py
+      - name: Discover both skills with the public installer
+        run: |
+          npx --yes skills@1.5.23 add . --list | tee /tmp/skill-list.txt
+          grep -q bibguard /tmp/skill-list.txt
+          grep -q iclr-paper-review /tmp/skill-list.txt
+      - name: Install both into a scratch Codex project
         run: |
           mkdir -p /tmp/proj
-          bash install.sh /tmp/proj
-          test -f /tmp/proj/.claude/skills/bibguard/scripts/bibguard.py
+          bash install.sh all --codex /tmp/proj
+          test -f /tmp/proj/.codex/skills/bibguard/scripts/bibguard.py
+          test -f /tmp/proj/.codex/skills/iclr-paper-review/SKILL.md
       - name: CLI runs with no arguments beyond the bib
-        run: python3 scripts/bibguard.py tests/sample.bib --uncited tests/sample.bib || true
+        run: python3 skills/bibguard/scripts/bibguard.py skills/bibguard/tests/sample.bib --uncited skills/bibguard/tests/sample.bib || true
