@@ -4,6 +4,7 @@
 #   bash install.sh                              # both, Codex, global
 #   bash install.sh bibguard --codex --user
 #   bash install.sh iclr-paper-review --claude /path/to/project
+#   bash install.sh paper-writing --claude /path/to/project
 #   bash install.sh all --claude --user
 set -euo pipefail
 
@@ -16,7 +17,7 @@ usage() {
   sed -n '2,7p' "$0"
   cat <<'EOF'
 
-Skills:  bibguard | iclr-paper-review | all
+Skills:  bibguard | iclr-paper-review | paper-writing | all
 Agents:  --codex (default) | --claude
 Scope:   --user (default) | /path/to/project
 EOF
@@ -24,7 +25,7 @@ EOF
 
 for arg in "$@"; do
   case "$arg" in
-    bibguard|iclr-paper-review|all) SELECTED="$arg" ;;
+    bibguard|iclr-paper-review|paper-writing|all) SELECTED="$arg" ;;
     --all) SELECTED=all ;;
     --codex) AGENT=codex ;;
     --claude) AGENT=claude ;;
@@ -53,7 +54,7 @@ else
 fi
 
 if [ "$SELECTED" = all ]; then
-  SKILLS="bibguard iclr-paper-review"
+  SKILLS="bibguard iclr-paper-review paper-writing"
 else
   SKILLS="$SELECTED"
 fi
@@ -74,6 +75,13 @@ for skill_name in $SKILLS; do
   cp -R "$source_dir" "$destination"
   [ -f "$destination/scripts/bibguard.py" ] && chmod +x "$destination/scripts/bibguard.py"
 
+  if [ "$skill_name" = paper-writing ]; then
+    command -v python3 >/dev/null || { echo "python3 is required for paper-writing" >&2; exit 1; }
+    chmod +x "$destination/scripts/paperlint.py"
+    python3 "$destination/tests/test_offline.py" >/dev/null
+    echo "· paper-writing offline self-check passed"
+  fi
+
   if [ "$skill_name" = bibguard ]; then
     command -v python3 >/dev/null || { echo "python3 is required for bibguard" >&2; exit 1; }
     python3 "$destination/tests/test_offline.py" >/dev/null
@@ -85,6 +93,7 @@ done
 
 cat <<EOF
 
-Invoke the skills as \$bibguard or \$iclr-paper-review in a supported agent.
-BibGuard CLI: python3 $DEST_ROOT/bibguard/scripts/bibguard.py references.bib
+Invoke the skills as \$bibguard, \$iclr-paper-review or \$paper-writing in a supported agent.
+BibGuard CLI:  python3 $DEST_ROOT/bibguard/scripts/bibguard.py references.bib
+paperlint CLI: python3 $DEST_ROOT/paper-writing/scripts/paperlint.py main.tex --outline OUTLINE.md
 EOF

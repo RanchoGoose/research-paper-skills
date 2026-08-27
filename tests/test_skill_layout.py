@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Offline structural checks for the two independent Agent Skills."""
+"""Offline structural checks for the three independent Agent Skills."""
 
 from pathlib import Path
 import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = {"bibguard", "iclr-paper-review"}
+EXPECTED = {"bibguard", "iclr-paper-review", "paper-writing"}
 
 
 def frontmatter(text: str):
@@ -51,4 +51,9 @@ bibguard_root = ROOT / "skills" / "bibguard"
 for relative in ("scripts/bibguard.py", "scripts/venues.json", "tests/test_offline.py"):
     assert (bibguard_root / relative).is_file(), f"missing {relative}"
 
-print("two independent skills validated: bibguard, iclr-paper-review")
+writing_root = ROOT / "skills" / "paper-writing"
+for relative in ("scripts/paperlint.py", "tests/test_offline.py", "tests/sample_good.tex",
+                 "tests/sample_bad.tex", "tests/sample_outline.md", "README.md"):
+    assert (writing_root / relative).is_file(), f"missing {relative}"
+
+print("three independent skills validated: bibguard, iclr-paper-review, paper-writing")

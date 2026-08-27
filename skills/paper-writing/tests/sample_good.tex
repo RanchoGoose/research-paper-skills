@@ -1,0 +1,31 @@
+\documentclass{article}
+\begin{document}
+\begin{abstract}
+Streaming generators produce video chunk by chunk. Each chunk conditions on
+generated content. Errors therefore accumulate. Systems pin a reference to
+slow this. Keeping that reference is unsolved. Frozen references go stale and
+refreshed ones inherit drift. We keep the opening latent and re-expand it on a
+schedule. The method is training-free. It adds no state. On matched controls
+it retains identity better than frozen and refreshed references. The gain is
+confined to identity. Total benchmark score is unchanged.
+\end{abstract}
+\section{Introduction}\label{sec:intro}
+Background paragraph. Generators (GEN) drift. Key-value (KV) caches are bounded.
+
+Problem paragraph. What should the pinned reference contain, and how is it kept?
+
+Our approach paragraph, with the motivation and the contributions.
+\begin{figure}[t]\centering\caption{small figure}\end{figure}
+\section{Related Work}\label{sec:related}
+\begin{figure}[t]\centering\caption{taxonomy}\end{figure}
+One category per paragraph.
+\section{Method}\label{sec:method}
+\begin{figure}[t]\centering\caption{framework}\end{figure}
+Let $\sigma$ denote the noise level and let $\mathbf{z}$ be the latent.
+\section{Experiments}\label{sec:exp}
+\begin{table}[t]\caption{Main results}\begin{tabular}{ll}a&b\end{tabular}\end{table}
+\begin{table}[t]\caption{Ablation of the schedule}\begin{tabular}{ll}a&b\end{tabular}\end{table}
+Table 1 carries the results.
+\section{Conclusion}\label{sec:conc}
+One paragraph.
+\end{document}

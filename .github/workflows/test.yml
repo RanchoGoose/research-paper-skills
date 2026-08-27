@@ -22,17 +22,21 @@ jobs:
       - name: Validate independent skill layout
         run: python3 tests/test_skill_layout.py
       - name: Offline tests
-        run: python3 skills/bibguard/tests/test_offline.py
-      - name: Discover both skills with the public installer
+        run: |
+          python3 skills/bibguard/tests/test_offline.py
+          python3 skills/paper-writing/tests/test_offline.py
+      - name: Discover the skills with the public installer
         run: |
           npx --yes skills@1.5.23 add . --list | tee /tmp/skill-list.txt
           grep -q bibguard /tmp/skill-list.txt
           grep -q iclr-paper-review /tmp/skill-list.txt
-      - name: Install both into a scratch Codex project
+          grep -q paper-writing /tmp/skill-list.txt
+      - name: Install all into a scratch Codex project
         run: |
           mkdir -p /tmp/proj
           bash install.sh all --codex /tmp/proj
           test -f /tmp/proj/.codex/skills/bibguard/scripts/bibguard.py
           test -f /tmp/proj/.codex/skills/iclr-paper-review/SKILL.md
+          test -f /tmp/proj/.codex/skills/paper-writing/scripts/paperlint.py
       - name: CLI runs with no arguments beyond the bib
         run: python3 skills/bibguard/scripts/bibguard.py skills/bibguard/tests/sample.bib --uncited skills/bibguard/tests/sample.bib || true

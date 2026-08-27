@@ -1,11 +1,12 @@
 # Research Paper Skills
 
-Two independent Agent Skills for research-paper quality control:
+Three independent Agent Skills for research-paper quality control:
 
 | Skill | Purpose |
 |---|---|
 | **bibguard** | Verify that citations exist, recover the real publication venue, add safe BibTeX entries, normalize bibliography format, and find uncited entries. |
 | **iclr-paper-review** | Perform strict ICLR-style review with semantic novelty analysis, claim-to-evidence tracing, equation/parameter checks, all-visual review, experimental-sufficiency and appendix-length audits, writing/citation logic, and calibrated 1–10 scoring. |
+| **paper-writing** | Write and revise the paper itself: outline and storyline before prose, a fixed abstract and introduction shape, one idea per paragraph, every claim with its evidence, every symbol defined before use, results in tables, no code paths in the body, appendix at most 20 pages — plus `paperlint`, which turns the measurable rules into a command with an exit code. |
 
 Each skill is self-contained under [`skills/`](skills/) and can be installed separately. They do not invoke or depend on each other.
 
@@ -26,6 +27,7 @@ Install only one skill:
 ```bash
 npx skills add RanchoGoose/research-paper-skills --skill bibguard -g -a codex -y
 npx skills add RanchoGoose/research-paper-skills --skill iclr-paper-review -g -a codex -y
+npx skills add RanchoGoose/research-paper-skills --skill paper-writing -g -a codex -y
 ```
 
 The same repository works with other supported agents; for example, replace `codex` with `claude-code`. To inspect the available skills before installing:
@@ -334,16 +336,47 @@ Use $iclr-paper-review to review this paper and supplementary material, audit ev
 
 The full rubric and specialized audit procedures live under [`skills/iclr-paper-review/references/`](skills/iclr-paper-review/references/).
 
+## Paper Writing
+
+`paper-writing` is the writing counterpart of the review skill: the house rules for
+producing the manuscript, and a linter that enforces the measurable half of them.
+
+The rules (in `skills/paper-writing/SKILL.md`, Chinese):
+
+- **outline first** — no change to the paper, down to a sentence, without first checking and changing the outline; the outline carries a storyline with a claim-to-evidence table, and a link with no evidence is not written;
+- every sentence has a purpose and a source, facts and opinions are kept apart, nothing is said twice, and the shorter version wins;
+- one idea per paragraph; the first paragraph of every section summarises it;
+- every term is either defined or cited; every symbol and abbreviation is defined before use; derivations become theorems;
+- a fixed abstract (background · problem · method · findings, ≤ 300 words, no experimental detail) and a three-paragraph introduction plus contributions;
+- one paragraph per category in related work, readable by an outsider, every citation through `bibguard`;
+- a framework figure in the method section and a figure in each of the first three sections; every number in a table; an ablation; recent SOTA baselines;
+- **no code paths, script names or flags in the body**; the appendix at most 20 pages, and the paper complete without it.
+
+`paperlint` checks what can be checked and exits with the number of hard failures:
+
+```bash
+python3 skills/paper-writing/scripts/paperlint.py main.tex --outline OUTLINE.md
+```
+
+| Level | Finding |
+|---|---|
+| HARD | paper modified without the outline · no storyline / evidence table in the outline · a section the outline never mentions · abstract over 300 words · introduction under three paragraphs · fewer than three main-text figures, or none in Introduction / Related Work / Method · no table in Experiments · no ablation · main text over 9 pages · appendix over 20 · a code path, script or flag in the body |
+| WARN | abstract shape or numeric detail · an acronym used before `Full Name (ACR)` · a math symbol with no defining sentence at first use · two sentences that say the same thing · a paragraph too long for one idea · a result literal in Experiments prose |
+| INFO | each section's opening sentence, to check that it summarises the section |
+
+It inlines `\input{}` so generated tables count, and reads page counts from the compiled `.log`, `.aux` and PDF. Standard library only; `tests/test_offline.py` runs without LaTeX, git or network.
+
 ---
 
 <a name="中文"></a>
 
 # 中文说明
 
-本仓库包含两个相互独立的论文质量技能：
+本仓库包含三个相互独立的论文质量技能：
 
 - **bibguard**：核实引用是否真实存在、查找正式出处、生成与统一 BibTeX，并检查未引用条目。
 - **iclr-paper-review**：按照严格 ICLR 标准审查创新、证据、摘要、全部图表、方法参数与公式、实验充分性、附录长度、写作引用和工作完整性，并给出单一 1–10 分。
+- **paper-writing**：写论文与改论文的规矩——先改大纲再改正文、故事线每个环节都有证据、每句话有目的有依据、一段一意、符号缩写先定义、摘要与引言固定格式、实验数字进表格、正文不出现代码路径、附录不超过 20 页；附带 `paperlint` 把能量化的规则变成带退出码的命令（`python3 skills/paper-writing/scripts/paperlint.py main.tex --outline OUTLINE.md`）。
 
 一键安装到 Codex：
 
@@ -351,7 +384,7 @@ The full rubric and specialized audit procedures live under [`skills/iclr-paper-
 npx skills add RanchoGoose/research-paper-skills --skill '*' -g -a codex -y
 ```
 
-也可以把 `--skill '*'` 换成 `--skill bibguard` 或 `--skill iclr-paper-review`，只安装其中一个。
+也可以把 `--skill '*'` 换成 `--skill bibguard`、`--skill iclr-paper-review` 或 `--skill paper-writing`，只安装其中一个。
 
 ## BibGuard 中文说明
 
