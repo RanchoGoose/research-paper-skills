@@ -5,7 +5,7 @@ Two independent Agent Skills for research-paper quality control:
 | Skill | Purpose |
 |---|---|
 | **bibguard** | Verify that citations exist, recover the real publication venue, add safe BibTeX entries, normalize bibliography format, and find uncited entries. |
-| **iclr-paper-review** | Perform strict ICLR-style review with semantic novelty analysis, claim-to-evidence tracing, abstract and main-text audits, per-figure/table review, writing/citation logic, and calibrated 1–10 scoring. |
+| **iclr-paper-review** | Perform strict ICLR-style review with semantic novelty analysis, claim-to-evidence tracing, equation/parameter checks, all-visual review, experimental-sufficiency and appendix-length audits, writing/citation logic, and calibrated 1–10 scoring. |
 
 Each skill is self-contained under [`skills/`](skills/) and can be installed separately. They do not invoke or depend on each other.
 
@@ -317,7 +317,10 @@ home or campus connection it enables itself.
 - semantic novelty analysis against the closest conceptual alternatives;
 - a claim-to-evidence ledger across the main text and appendix;
 - a strict abstract audit for clarity, concision, whole-paper coverage, and detail control;
-- a main-text self-containment gate and individual audit of every figure and table;
+- a main-text self-containment gate and individual audit of every main-text and appendix figure and table, including cross-reference correctness;
+- a parameter, notation, and equation ledger with mathematical, type, shape, dimensional, and logical checks;
+- an experimental-sufficiency audit covering baseline fairness, numerical clarity, generality, scale, and reproducibility;
+- an explicit appendix-length verdict: target at most 20 pages and hard maximum 30 pages under the default rubric;
 - writing, terminology, definition, citation, and narrative-logic review;
 - insight, field impact, workload, completeness, and contribution-versus-defect judgment;
 - one calibrated 1–10 ICLR score, with 8 reserved for Strong Accept;
@@ -326,7 +329,7 @@ home or campus connection it enables itself.
 Invoke it after installation with a request such as:
 
 ```text
-Use $iclr-paper-review to review this paper and supplementary material, audit every main-text figure and table, and give one calibrated ICLR score.
+Use $iclr-paper-review to review this paper and supplementary material, audit every equation, parameter, figure and table, assess experimental sufficiency and appendix length, and give one calibrated ICLR score.
 ```
 
 The full rubric and specialized audit procedures live under [`skills/iclr-paper-review/references/`](skills/iclr-paper-review/references/).
@@ -340,7 +343,7 @@ The full rubric and specialized audit procedures live under [`skills/iclr-paper-
 本仓库包含两个相互独立的论文质量技能：
 
 - **bibguard**：核实引用是否真实存在、查找正式出处、生成与统一 BibTeX，并检查未引用条目。
-- **iclr-paper-review**：按照严格 ICLR 标准审查创新、证据、摘要、正文图表、写作引用、工作完整性，并给出单一 1–10 分。
+- **iclr-paper-review**：按照严格 ICLR 标准审查创新、证据、摘要、全部图表、方法参数与公式、实验充分性、附录长度、写作引用和工作完整性，并给出单一 1–10 分。
 
 一键安装到 Codex：
 

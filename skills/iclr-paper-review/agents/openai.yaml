@@ -1,4 +1,4 @@
 interface:
   display_name: "Strict ICLR Paper Review"
-  short_description: "Evidence, visuals, writing, novelty, and ICLR scoring"
-  default_prompt: "Use $iclr-paper-review to strictly review this paper, audit the abstract and every main-text figure/table, trace claims to evidence, and give one calibrated ICLR score."
+  short_description: "Evidence, equations, visuals, experiments, and ICLR scoring"
+  default_prompt: "Use $iclr-paper-review to strictly review this paper, audit the abstract, every equation and parameter, every figure/table, experimental sufficiency, and appendix length, then give one calibrated ICLR score."

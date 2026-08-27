@@ -40,6 +40,8 @@ review_root = ROOT / "skills" / "iclr-paper-review"
 for relative in (
     "references/review-rubric.md",
     "references/main-text-audit.md",
+    "references/method-equation-audit.md",
+    "references/experiment-appendix-audit.md",
     "references/iterative-review-loop.md",
     "agents/openai.yaml",
 ):

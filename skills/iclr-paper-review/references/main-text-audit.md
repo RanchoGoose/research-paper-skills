@@ -1,6 +1,6 @@
-# Main-text self-containment and figure/table audit
+# Main-text self-containment and all-visual audit
 
-Use this reference for empirical papers and any paper whose argument depends on figures or tables.
+Use this reference for empirical papers and any paper whose argument depends on figures or tables. Audit every figure and table in both the main paper and appendix; apply the additional self-containment and evidence-visibility gate to the main paper.
 
 ## Abstract gate
 
@@ -52,9 +52,21 @@ Scan the main text for:
 
 For each, identify a main-text table or figure that visibly carries the evidence. If none exists, classify it as a substantive evidence-visibility defect. Interpretation may remain in prose; decisive empirical evidence may not.
 
-## Audit every main-text figure
+## Cross-reference and placement audit for every visual
 
-Record the figure number, page, role, asserted conclusion, and verdict. Check:
+For every figure and table in the main paper and appendix, verify:
+
+1. It is cited in prose by the correct number before or near its appearance.
+2. Every panel, row, column, or cell invoked by the prose actually exists and has the stated label.
+3. The prose points to the exact visual evidence that supports the sentence rather than to a loosely related visual.
+4. Numbering, labels, and references are consistent after compilation; there are no orphan visuals, unresolved references, duplicate labels, or misleading forward references.
+5. A main-text claim that depends on an appendix visual is identified as an appendix-dependence defect when the evidence is central.
+
+Record uncited, miscited, or ambiguously cited visuals even if their content is otherwise correct.
+
+## Audit every figure
+
+Record whether it is in the main text or appendix, plus figure number, page, first prose citation, role, asserted conclusion, and verdict. Check:
 
 1. **Placement and size:** appears near first use; not stranded, clipped, or undersized.
 2. **Legibility:** labels, tick marks, annotations, legends, and panel letters are readable at normal page scale.
@@ -69,9 +81,9 @@ Record the figure number, page, role, asserted conclusion, and verdict. Check:
 
 For qualitative figures, additionally check whether examples share inputs/seeds where comparison requires it, whether failures are shown, and whether the figure is evidence or illustration.
 
-## Audit every main-text table
+## Audit every table
 
-Record the table number, page, role, asserted conclusion, and verdict. Check:
+Record whether it is in the main text or appendix, plus table number, page, first prose citation, role, asserted conclusion, and verdict. Check:
 
 1. **Placement and density:** readable at normal scale; no clipping, microscopic font, extreme compression, or page-breaking confusion.
 2. **Rows and columns:** comparison objects, metrics, directionality, units, sample counts, and analysis units are explicit.
@@ -94,6 +106,7 @@ End with:
 
 - whether the main text is acceptance-self-contained;
 - which figures/tables fully support their intended claims;
+- which are uncited, miscited, ambiguously cited, or inconsistent with the prose;
 - which are readable but scientifically incomplete;
 - which are misleading or unverifiable;
 - every decisive result still carried only by prose or appendix;

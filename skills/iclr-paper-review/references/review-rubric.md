@@ -31,7 +31,15 @@ Use this to detect concept substitution, undefined mechanisms, changing comparis
 
 ### Figure and table inventory
 
-List every main-text figure and table with its page, asserted conclusion, evidence level, and audit verdict. Use `main-text-audit.md` for the checks.
+List every main-text and appendix figure and table with its page, first prose citation, asserted conclusion, evidence level, and audit verdict. Mark whether it is correctly cited, legible, self-contained, and acceptance-critical. Use `main-text-audit.md` for the checks.
+
+### Notation and equation ledger
+
+For every method symbol, parameter, operator, objective, constraint, and displayed or inline formula that carries scientific content, record its first definition, type/domain/shape/units, scientific role, whether notation is conventional or explained, mathematical validity, and the exact claim it supports. Use `method-equation-audit.md` for the checks.
+
+### Experimental completeness ledger
+
+For every empirical claim, record datasets/tasks, models, baselines, tuning fairness, splits and preprocessing, metrics, analysis unit, sample size, seeds/repetitions, uncertainty or statistical test, compute context, evidence location, and tested boundary. Use `experiment-appendix-audit.md` for the checks.
 
 ## Semantic novelty test
 
@@ -87,25 +95,36 @@ Complete coverage is conceptual, not exhaustive. The abstract should summarize t
 
 Expose the decisive ledger. Cite claim and evidence locations. Identify overclaiming, underclaiming, missing controls, alternative explanations, selective presentation, and the most important unresolved boundary.
 
-### 4. Main-text evidence visibility and per-visual audit
+### 4. Methods, parameters, notation, and formula audit
+
+- Check definition-and-use consistency for every quantity.
+- Check formula correctness, assumptions, derivational support, and claim relevance.
+
+### 5. Main-text evidence visibility and all-visual audit
 
 - State whether a reviewer can verify every central contribution without reading the appendix.
-- Audit every main-text figure and table individually.
+- Audit every main-text and appendix figure and table individually, including prose citation correctness.
 - Identify prose-only experimental claims and core evidence located only in the appendix.
 
-### 5. Writing, terminology, citations, and narrative logic
+### 6. Experimental sufficiency, generality, scale, and appendix length
+
+- Judge whether comparisons and numerical displays substantiate superiority.
+- Judge breadth and scale relative to the claimed scope, plus reproducibility completeness.
+- Report the exact appendix page count, counting convention, and verdict against the 20-page target and 30-page maximum.
+
+### 7. Writing, terminology, citations, and narrative logic
 
 Assess clarity, definitions, notation, terminology, reproducibility, citation entailment, novelty attribution, internal consistency, causal chain, and boundary discipline. Distinguish cosmetic prose from ambiguity that changes science.
 
-### 6. New insight, field impact, workload, and completeness
+### 8. New insight, field impact, workload, and completeness
 
 Judge frontier awareness, depth and likely influence, quantity and coherence of supported contributions, experimental/theoretical workload, and whether the paper forms a complete scientific unit.
 
-### 7. Strengths
+### 9. Strengths
 
 List only substantiated strengths, ordered by importance.
 
-### 8. Weaknesses and required clarifications
+### 10. Weaknesses and required clarifications
 
 Separate:
 
@@ -115,11 +134,11 @@ Separate:
 
 For each weakness, state why it matters and the smallest evidence or revision that would resolve it.
 
-### 9. Contribution versus defects
+### 11. Contribution versus defects
 
 State one of: contribution greater than defects, approximately balanced, or defects greater than contribution. State what contribution survives all identified weaknesses.
 
-### 10. ICLR score and confidence
+### 12. ICLR score and confidence
 
 | Score | Anchor |
 |---:|---|
