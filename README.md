@@ -6,7 +6,7 @@ Three independent Agent Skills for research-paper quality control:
 |---|---|
 | **bibguard** | Verify that citations exist, recover the real publication venue, add safe BibTeX entries, normalize bibliography format, and find uncited entries. |
 | **iclr-paper-review** | Perform strict ICLR-style review with semantic novelty analysis, claim-to-evidence tracing, equation/parameter checks, all-visual review, experimental-sufficiency and appendix-length audits, writing/citation logic, and calibrated 1–10 scoring. |
-| **paper-writing** | Write and revise the paper itself: outline and storyline before prose, a fixed abstract and introduction shape, one idea per paragraph, every claim with its evidence, every symbol defined before use, results in tables, no code paths in the body, appendix at most 20 pages — plus `paperlint`, which turns the measurable rules into a command with an exit code. |
+| **paper-writing** | Write and revise the paper itself: outline and storyline before prose, a fixed abstract and introduction shape, one idea per paragraph, every claim with its evidence, every symbol defined before use, results in tables, no code paths in the body, an appendix at most 20 pages that starts on its own page under its own title with its floats renumbered per appendix section, and the typesetting rules a reader sees before reading a word — plus `paperlint`, which turns the measurable rules into a command with an exit code. |
 
 Each skill is self-contained under [`skills/`](skills/) and can be installed separately. They do not invoke or depend on each other.
 
@@ -350,7 +350,8 @@ The rules (in `skills/paper-writing/SKILL.md`, Chinese):
 - a fixed abstract (background · problem · method · findings, ≤ 300 words, no experimental detail) and a three-paragraph introduction plus contributions;
 - one paragraph per category in related work, readable by an outsider, every citation through `bibguard`;
 - a framework figure in the method section and a figure in each of the first three sections; every number in a table; an ablation; recent SOTA baselines;
-- **no code paths, script names or flags in the body**; the appendix at most 20 pages, and the paper complete without it.
+- **no code paths, script names or flags in the body**; the appendix at most 20 pages, starting on its own page under a title that carries the paper's own, its figures and tables renumbered under their appendix section (Table A.1, not Table 18, so the number says which appendix to open), and the paper complete without it;
+- **typesetting is what the reader sees first**: caption skips set per float type — a table's caption sits above it and a figure's below, so the one global pair `article` ships cannot serve both and leaves table captions resting on the top rule — figure widths and `trim` measured off the source rather than guessed, and a fixed order for tightening a page: float separations, then `\bibsep`, then a negative `\vspace`, and only then a sentence.
 
 `paperlint` checks what can be checked and exits with the number of hard failures:
 
@@ -361,7 +362,7 @@ python3 skills/paper-writing/scripts/paperlint.py main.tex --outline OUTLINE.md
 | Level | Finding |
 |---|---|
 | HARD | paper modified without the outline · no storyline / evidence table in the outline · a section the outline never mentions · abstract over 300 words · introduction under three paragraphs · fewer than three main-text figures, or none in Introduction / Related Work / Method · no table in Experiments · no ablation · main text over 9 pages · appendix over 20 · a code path, script or flag in the body |
-| WARN | abstract shape or numeric detail · an acronym used before `Full Name (ACR)` · a math symbol with no defining sentence at first use · two sentences that say the same thing · a paragraph too long for one idea · a result literal in Experiments prose |
+| WARN | abstract shape or numeric detail · an acronym used before `Full Name (ACR)` · a math symbol with no defining sentence at first use · two sentences that say the same thing · a paragraph too long for one idea · a result literal in Experiments prose · `\appendix` with no `\clearpage` before it · an appendix with no title, or one that does not carry the paper's · appendix floats still numbered on the body's count · caption-above tables while `\belowcaptionskip` is never set non-zero |
 | INFO | each section's opening sentence, to check that it summarises the section |
 
 It inlines `\input{}` so generated tables count, and reads page counts from the compiled `.log`, `.aux` and PDF. Standard library only; `tests/test_offline.py` runs without LaTeX, git or network.

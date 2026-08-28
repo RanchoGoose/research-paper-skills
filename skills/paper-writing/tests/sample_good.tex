@@ -1,4 +1,10 @@
 \documentclass{article}
+% Table captions sit above the tabular, so \belowcaptionskip is the gap between
+% the caption and the top rule; the class default of 0pt makes them touch.
+\setlength{\abovecaptionskip}{8pt}
+\setlength{\belowcaptionskip}{5pt}
+\newcommand{\papertitle}{Scheduled Re-expansion of the Opening Latent}
+\title{\papertitle}
 \begin{document}
 \begin{abstract}
 Streaming generators produce video chunk by chunk. Each chunk conditions on
@@ -27,5 +33,18 @@ Let $\sigma$ denote the noise level and let $\mathbf{z}$ be the latent.
 \begin{table}[t]\caption{Ablation of the schedule}\begin{tabular}{ll}a&b\end{tabular}\end{table}
 Table 1 carries the results.
 \section{Conclusion}\label{sec:conc}
+One paragraph.
+\clearpage
+\appendix
+\begin{center}
+{\Large Appendix}\\[7pt]
+{\large\papertitle}
+\end{center}
+% Appendix floats are numbered under their own section: Table A.1, not Table 3.
+\setcounter{figure}{0}\setcounter{table}{0}
+\counterwithin{figure}{section}
+\counterwithin{table}{section}
+\section{Extra protocol detail}\label{app:extra}
+\begin{table}[t]\caption{Protocol}\begin{tabular}{ll}a&b\end{tabular}\end{table}
 One paragraph.
 \end{document}

@@ -697,6 +697,147 @@ def check_code_refs(lines, S, args, R: Report, mask):
         R.add(HARD, "code-ref", args.tex, f"{n - 30} more lines with code references not listed")
 
 
+# ---------------------------------------------------------------- layout
+
+def _newcommands(lines: List[Line]) -> Dict[str, str]:
+    """{macro name -> body} for one-argument \newcommand definitions."""
+    out = {}
+    for ln in lines:
+        for m in re.finditer(r"\\(?:new|renew|provide)command\*?\s*\{?\\([A-Za-z]+)\}?\s*(?=\{)", ln.text):
+            body, _ = brace_arg(ln.text, ln.text.index("{", m.end() - 1))
+            out[m.group(1)] = body
+    return out
+
+
+def _expand(s: str, macros: Dict[str, str], depth: int = 3) -> str:
+    for _ in range(depth):
+        new = re.sub(r"\\([A-Za-z]+)\b", lambda m: macros.get(m.group(1), m.group(0)), s)
+        if new == s:
+            break
+        s = new
+    return s
+
+
+def _words(s: str) -> List[str]:
+    return [w for w in re.findall(r"[A-Za-z]{3,}", detex(s).lower()) if w != "cmd"]
+
+
+def check_layout(lines, S, args, R: Report):
+    r"""Three things the eye catches on a printed page and no other check sees.
+
+    **The appendix has to start on its own page, under its own title.** Left to
+    itself it starts wherever the reference list happens to stop -- often a few
+    entries down a page it shares with the bibliography -- and the first
+    appendix section then reads as a continuation of the references. The title
+    should carry the paper's title as well as the word "Appendix": a
+    supplementary that gets printed, downloaded or reviewed on its own has to
+    say what it belongs to. Take it from the same macro `\title` uses, or the
+    two drift apart the next time either is edited.
+
+    **A caption above a table needs \belowcaptionskip.** Table captions
+    conventionally sit above the tabular and figure captions below the graphic,
+    so one pair of caption skips means opposite things to the two float types
+    and no single global setting serves both. `article` ships 10pt above and
+    **0pt below**, which on a caption-above table rests the caption's last line
+    directly on the top rule while \textfloatsep still separates the table from
+    the text under it -- the caption ends up looking further from its own table
+    than the table is from the next paragraph. Setting the pair per float type
+    (at \begin{table} and \begin{figure}, inside the float's own group, so
+    neither leaks into the other) is the fix.
+
+    **Appendix floats are numbered under their appendix section**, A.1 and C.2
+    rather than continuing the body's count into Figure 7 and Table 18. A
+    number that continues the body's sequence tells the reader nothing about
+    where to look: they have to count eighteen tables forward through material
+    whose sections are lettered, not numbered. \counterwithin{figure}{section}
+    after \appendix does both halves -- the prefix and a reset at every
+    section -- so the two numbering systems cannot collide.
+    """
+    macros = _newcommands(lines)
+
+    ap = S.get("appendix_at")
+    if ap is not None:
+        head = "\n".join(lines[i].text for i in range(max(0, ap - 6), ap))
+        if not re.search(r"\\(clearpage|newpage|cleardoublepage)\b", head):
+            R.add(WARN, "appendix-page", lines[ap].where(),
+                  r"\appendix is not preceded by \clearpage: the appendix will start "
+                  r"wherever the reference list happens to stop")
+        stop = min([s.idx for s in S["sections"] if s.idx > ap] or [len(lines)])
+        block = "\n".join(lines[i].text for i in range(ap, stop))
+        if not re.search(r"Appendix|APPENDIX", _expand(block, macros)):
+            R.add(WARN, "appendix-title", lines[ap].where(),
+                  "no title between \\appendix and its first section -- the appendix "
+                  "opens with no heading of its own")
+        else:
+            title = ""
+            for ln in lines:
+                m = re.search(r"\\title\s*(?=\{)", ln.text)
+                if m:
+                    title, _ = brace_arg(ln.text, ln.text.index("{", m.end() - 1))
+                    break
+            tw = set(_words(_expand(title, macros)))
+            bw = set(_words(_expand(block, macros)))
+            if tw and len(tw & bw) < max(2, len(tw) // 3):
+                R.add(WARN, "appendix-title", lines[ap].where(),
+                      "the appendix title does not carry the paper's title -- a "
+                      "supplementary read on its own cannot say what it belongs to")
+
+        tail = "\n".join(lines[i].text for i in range(ap, len(lines)))
+        unnumbered = []
+        for kind in ("figure", "table"):
+            if not re.search(r"\\begin\{" + kind + r"\*?\}", tail):
+                continue
+            if not (re.search(r"\\counterwithin\*?\s*\{" + kind + r"\}", tail)
+                    or re.search(r"\\(renew|provide)command\*?\s*\{?\\the" + kind + r"\}?", tail)
+                    or re.search(r"\\@addtoreset\s*\{" + kind + r"\}", tail)):
+                unnumbered.append(kind)
+        if unnumbered:
+            R.add(WARN, "appendix-numbering", lines[ap].where(),
+                  " and ".join(unnumbered) + " numbering continues the main text's count "
+                  r"into the appendix -- use \counterwithin{" + unnumbered[0] +
+                  "}{section} so an appendix float is numbered under its own section "
+                  "(A.1, C.2) and the number says which appendix to open")
+
+    above = 0
+    for i, ln in enumerate(lines):
+        if r"\begin{table}" not in ln.text:
+            continue
+        chunk = ""
+        for j in range(i, min(i + 60, len(lines))):
+            chunk += lines[j].text + "\n"
+            if r"\end{table}" in lines[j].text:
+                break
+        c, t = chunk.find(r"\caption"), chunk.find(r"\begin{tabular}")
+        if c >= 0 and t >= 0 and c < t:
+            above += 1
+    if above:
+        src = "\n".join(ln.text for ln in lines)
+        # Any non-zero setting counts, however it is spelled: a literal
+        # \setlength, a \captionsetup, or -- the form that actually gets used
+        # once the two float types need different values -- a length register
+        # the float hooks copy in, whose own \setlength is somewhere else
+        # entirely. Resolve one level of that indirection rather than reporting
+        # a paper that has already done the right thing.
+        vals = []
+        for raw in re.findall(r"belowcaptionskip\}?\s*\{([^}]*)\}", src):
+            raw = raw.strip()
+            m = re.match(r"([0-9.]+)\s*pt", raw)
+            if m:
+                vals.append(float(m.group(1)))
+                continue
+            m = re.match(r"\\([A-Za-z]+)$", raw)
+            if m:
+                vals += [float(v) for v in
+                         re.findall(r"\\" + m.group(1) + r"\}?\s*\{\s*([0-9.]+)\s*pt", src)]
+        vals += [float(v) for v in re.findall(r"belowskip\s*=\s*([0-9.]+)\s*pt", src)]
+        if not vals or all(v == 0 for v in vals):
+            R.add(WARN, "caption-skip", args.tex,
+                  f"{above} table(s) put the caption above the tabular but "
+                  r"\belowcaptionskip is never set to a non-zero length: the caption "
+                  r"will touch the top rule while \textfloatsep separates the table "
+                  "from the text below it")
+
+
 # ---------------------------------------------------------------- main
 
 def main(argv=None) -> int:
@@ -735,6 +876,7 @@ def main(argv=None) -> int:
     check_paragraphs(lines, S, args, R, mask)
     check_numbers(lines, S, args, R, mask)
     check_code_refs(lines, S, args, R, mask)
+    check_layout(lines, S, args, R)
 
     rank = {HARD: 0, WARN: 1, INFO: 2}
     for it in sorted(R.items, key=lambda x: (rank[x["level"]], x["code"])):

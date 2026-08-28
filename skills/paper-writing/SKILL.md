@@ -1,6 +1,6 @@
 ---
 name: paper-writing
-description: 写论文与改论文的唯一入口——从大纲和故事线出发写摘要、引言、相关工作、方法、实验、结论与附录；每句话有目的、有依据；事实与观点分开；符号与缩写先定义后使用；摘要/引言/各章节按固定格式；实验数字一律进表格；正文不出现代码路径；附录不超过 20 页。附带 paperlint 门禁把能量化的规则变成命令。**凡是动 paper 正文——哪怕一句话——都先过这个 skill：先改大纲，再改正文，最后跑 paperlint。** 触发词：写论文、写 paper、改 paper、写摘要、abstract、introduction、related work、method、实验章节、conclusion、附录、appendix、润色、精简、故事线、大纲、outline、paperlint。
+description: 写论文与改论文的唯一入口——从大纲和故事线出发写摘要、引言、相关工作、方法、实验、结论与附录；每句话有目的、有依据；事实与观点分开；符号与缩写先定义后使用；摘要/引言/各章节按固定格式；实验数字一律进表格；正文不出现代码路径；附录另起一页、带自己的标题、图表按附录章节号重编、不超过 20 页；caption 与表图的间距按 float 类型分设。附带 paperlint 门禁把能量化的规则变成命令。**凡是动 paper 正文——哪怕一句话——都先过这个 skill：先改大纲，再改正文，最后跑 paperlint。** 触发词：写论文、写 paper、改 paper、写摘要、abstract、introduction、related work、method、实验章节、conclusion、附录、appendix、润色、精简、故事线、大纲、outline、paperlint、排版、页数、caption、间距、figure 太小。
 ---
 
 # 写 paper 的总规矩（paper-writing）
@@ -91,6 +91,30 @@ paperlint 会拒绝「`main.tex` 改了、`OUTLINE.md` 没改」的工作区。
 ### Appendix
 
 - **不超过 20 页**（特殊情况除外）。
+- **必须另起一页**（`\clearpage`）。否则它从参考文献恰好结束的地方开始——常常是共用页的第三条
+  文献下面——第一个附录 section 读起来就像文献表的续篇。
+- **必须有自己的标题，且标题里要含论文标题。** 补充材料会被单独打印、单独下载、单独送审，
+  只写「Appendix」的话它说不出自己属于哪篇论文。**标题用和 `\title` 同一个宏**
+  （`\newcommand{\papertitle}{...}`），否则两处早晚会对不上：
+
+  ```latex
+  \clearpage
+  \appendix
+  \begin{center}
+  {\Large\sc Appendix}\\[7pt]
+  {\large\papertitle}
+  \end{center}
+  ```
+- **附录里的图表要按附录章节号重新编号，不要延续正文的计数。** 正文是 Figure 3 / Table 5，
+  附录就该是 Figure A.1 / Table C.2，而不是接着数成 Figure 7 / Table 18。延续正文计数的编号
+  不告诉读者去哪找——他得在一堆按字母编号的章节里往前数十八张表；`A.1` / `C.2` 直接说明
+  开哪一节。`\counterwithin` 顺手把「每个 `\section` 归零」也做了，两套编号不会撞：
+
+  ```latex
+  \setcounter{figure}{0}\setcounter{table}{0}
+  \counterwithin{figure}{section}
+  \counterwithin{table}{section}
+  ```
 - 附录只做补充说明；**核心实验结论必须放在正文**。默认不带附录也是一篇完整、充分的优秀论文。
 
 ## 3. 门：paperlint
@@ -119,6 +143,10 @@ python3 $P main.tex --acronyms-ok .paperlint_acronyms  # 不必定义的缩写�
 | HARD | `tables-count` / `ablation` | 实验章节没有表；全文没有 ablation |
 | HARD | `pages-main` / `pages-appendix` | 正文超 9 页；附录超 20 页 |
 | HARD | `code-ref` | 正文出现代码路径、脚本名或命令行参数 |
+| WARN | `appendix-page` | `\appendix` 前面没有 `\clearpage`——附录没有另起一页 |
+| WARN | `appendix-title` | 附录没有标题，或标题里不含论文标题 |
+| WARN | `appendix-numbering` | 附录里有图表，但编号还在延续正文的计数 |
+| WARN | `caption-skip` | 表的 caption 在上，而 `\belowcaptionskip` 从未设成非零——caption 会贴住表格 |
 | WARN | `acronym` | 缩写在「全称 (缩写)」定义之前就用了 |
 | WARN | `symbol` | 数学符号首次出现处附近没有定义句 |
 | WARN | `repeat` | 两句话说的是同一件事 |
@@ -129,7 +157,67 @@ python3 $P main.tex --acronyms-ok .paperlint_acronyms  # 不必定义的缩写�
 paperlint 会内联 `\input{}` 和 `\IfFileExists{}{\input{}}{}`，所以生成到 `gen/` 里的表格也算数。
 页数从编译产物读：`main.log` 给总页数，`main.aux` 给附录起始页，`pdftotext` 找正文结束页。
 
-## 4. 写完前的自检（机器查不了的部分）
+## 4. 排版：读者看到的是版面，不是源码
+
+排版不是内容，但读者第一眼看到的是它。下面几条是反复踩出来的。
+
+### caption 的间距必须按 float 类型分设
+
+**表的 caption 在表上面，图的 caption 在图下面，所以同一对长度对两者意思相反，
+一个全局设置不可能同时对。** `article` 的默认是 `\abovecaptionskip=10pt / \belowcaptionskip=0pt`：
+对表来说 caption 最后一行直接压在 `\toprule` 上，而表和下面正文之间还有整整一个
+`\textfloatsep`——**caption 看上去离自己的表比表离下一段还远。**
+
+用 `etoolbox` 在每种 float 打开时设自己的值，在 float 自己的组里，互不泄漏：
+
+```latex
+\usepackage{etoolbox}
+\newlength{\tabcapabove}\newlength{\tabcapbelow}
+\newlength{\figcapabove}\newlength{\figcapbelow}
+\setlength{\tabcapabove}{8pt}\setlength{\tabcapbelow}{5pt}
+\setlength{\figcapabove}{6pt}\setlength{\figcapbelow}{0pt}
+\AtBeginEnvironment{table}{%
+  \setlength{\abovecaptionskip}{\tabcapabove}\setlength{\belowcaptionskip}{\tabcapbelow}}
+\AtBeginEnvironment{figure}{%
+  \setlength{\abovecaptionskip}{\figcapabove}\setlength{\belowcaptionskip}{\figcapbelow}}
+```
+
+经验值：正文表 8/5、附录表 5/3，图的 image→caption 6pt / 3pt。
+**判断标准是「caption 离自己的表，要明显近于表离无关正文」。**
+
+### 图：宽度和 trim 都要量，不要拍脑袋
+
+- `0.8\textwidth` 这种随手写的宽度会白扔一大块版心。图不占满宽只应该有具体理由。
+- 放大前先算**有效分辨率**：`源图内嵌位图的 ppi ÷ (排版宽度 ÷ 源图宽度)`。
+  ≥300 ppi 就不会糊，够就放心占满宽。
+- **`trim` 按源图自己的墨迹范围量出来，不要猜。** 把源图渲染成灰度位图、找出全白的行，
+  就能读到每一行内容的精确边界；猜出来的 trim 很容易切进坐标轴框，或留下一圈死白。
+
+### 正文/附录差几行时，按这个顺序收
+
+1. **float 间距**（`\textfloatsep` / `\floatsep` / `\intextsep`），最划算，不动任何内容。
+2. **`\bibsep`**——natbib 从 `\itemsep+\parsep` 取值。参考文献只多出几条到下一页时，
+   把它调小 2pt 就能整页省下来，一个条目都不用动。
+3. **负 `\vspace`**，只用在节标题前后这种明确的地方。
+4. 最后才是删句子。**删事实和表格永远是最后手段。**
+
+**先诊断是 text-bound 还是 float-bound。** 附录页数下不来时，常常是半空的 float 页在吃掉
+删掉的散文——一页只排了 53 行而满页是 87 行，这时删字没有用。该做的是：收 float/caption 间距、
+把长节移到参考材料前面让尾部的 float 页塌掉、把已经被正文逐字引用的表改成随 bundle 发布不排版、
+把相邻的两张图合成一个 float 两个 caption。**用负 `\vspace` 收不掉 float 排布留下的缝隙**——
+那不是显式跳距，硬压只会换来 overfull vbox。
+
+### 随论文发布的源码和注释里，不要留内部迭代语汇
+
+「Reviewer round 3 asked for…」「reviewer A2」「path-to-8」这类话进了 supplementary，
+**在投稿期会被读成本届审稿人**，而且把内部迭代史一起发了出去。
+**留原因，去出处**：「为什么这张表不排版」值得留，「谁要求的」不留。
+指将来读稿的人的「a reviewer」可以留。
+
+清理措辞时**顺手核对措辞指向的东西是否存在**——补充材料里指向的文件是否真的进了包、
+正文引用的计划文件是不是恰好在打包 denylist 上。这类洞往往就是这么冒出来的。
+
+## 5. 写完前的自检（机器查不了的部分）
 
 - [ ] 故事线一句话能说清；摘要、引言、结论说的是同一条线。
 - [ ] 每个 section 第一段就是本节的总结。
@@ -140,10 +228,11 @@ paperlint 会内联 `\input{}` 和 `\IfFileExists{}{\input{}}{}`，所以生成�
 - [ ] Related Work 每段一个类别；领域外读者能读懂。
 - [ ] 方法图看一眼就知道框架；颜色有逻辑；符号和正文一致。
 - [ ] 实验：设置与超参数表、主结果表、ablation 表、与 SOTA 的对比表；metrics 有出处。
-- [ ] 附录 ≤ 20 页；把附录整个删掉，正文仍是一篇完整的论文。
+- [ ] 附录 ≤ 20 页；另起一页；标题含论文标题；图表按附录章节号编号；把附录整个删掉，正文仍是一篇完整的论文。
+- [ ] 逐页看过一遍 PDF：没有裁切、重叠、糊掉的图，caption 和它的表图之间有明确但更近的间距。
 - [ ] `bibguard` 退出码 0；`--uncited` 0 条。
 
-## 5. 与其他 skill 的关系
+## 6. 与其他 skill 的关系
 
 - `bibguard`：所有引用的唯一入口。本 skill 不查引用真伪，只要求引用必须经它写入。
 - `iclr-paper-review`：审稿用。本 skill 是写作用；审稿意见回到本 skill 的流程（先改大纲）里落地。
