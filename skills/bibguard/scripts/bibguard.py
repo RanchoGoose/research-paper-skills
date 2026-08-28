@@ -761,6 +761,22 @@ def cmd_add(bib_path, query, am_key, use_dblp, dry_run):
     return 0
 
 
+def anchor_flag(anchors, errs):
+    """The note for an entry no independent source anchored, or '' if one did.
+
+    「查过、没命中」和「根本没查成」在这里长得一模一样:限流(429)或超时会让
+    arXiv/OpenReview/Crossref 全部空手而归,锚点同样是空的。混为一谈是危险的
+    —— 它把一条正确的条目报成「查无此文」,而下一步动作是去改它。实测:一轮
+    全量重查里 63 条有 4 条这样标红,四条的 errs 全是 429、arxiv_title 全是
+    None,查询压根没发出去。两种都算 need_action(没验过就是没过),但话得说对。
+    """
+    if anchors:
+        return ''
+    if errs:
+        return ' | 🟡本轮未验证(源被限流/超时,不等于查无此文;单独重跑本条)'
+    return ' | 🔴无独立验证锚点(arXiv/DOI/OpenReview 都没命中,须人工核原文)'
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('bib')
@@ -815,7 +831,15 @@ def main():
 
     cache_path = os.path.join(os.path.dirname(os.path.abspath(a.bib)), '.refcache.json')
     cache = {}
-    if os.path.exists(cache_path) and not a.refresh:
+    # Always LOAD the cache, even under --refresh. --refresh means "do not
+    # trust the rows for the entries I am checking", not "throw away the rows
+    # for the entries I am not". Starting from {} and then dumping the dict
+    # deleted every row this run did not touch: one
+    # `--only <key> --refresh` took a 63-row cache down to 4, so the next full
+    # sweep had to re-query everything, walked straight into the rate limit,
+    # and reported entries as unverified that had been verified minutes before.
+    # A refresh that destroys evidence makes the next run worse, not fresher.
+    if os.path.exists(cache_path):
         try:
             cache = json.load(open(cache_path, encoding='utf-8'))
         except Exception:
@@ -824,7 +848,7 @@ def main():
     results, need_action, plan = [], 0, {}
     for i, e in enumerate(entries, 1):
         ck = e['key'] + '|' + norm(e['title'])[:80]
-        cached = cache.get(ck)
+        cached = None if a.refresh else cache.get(ck)
         # Two reasons never to trust a cached row blindly:
         #  - it carries an API error: that is a failure that happened to be
         #    written down, not a finding. Treating a 429 as "checked, nothing
@@ -882,9 +906,9 @@ def main():
         # 标题勘误
         if r['arxiv_title'] and sim(e['title'], r['arxiv_title']) < 0.97:
             flag += ' | 📝标题与 arXiv 官方不一致'; need_action += 1
-        # 没有任何独立锚点 = 这条谁也没验过,必须人工看原文
-        if not r.get('anchors'):
-            flag += ' | 🔴无独立验证锚点(arXiv/DOI/OpenReview 都没命中,须人工核原文)'
+        anchor_note = anchor_flag(r.get('anchors'), r.get('errs'))
+        if anchor_note:
+            flag += anchor_note
             need_action += 1
 
         line = "[%02d] %-22s %-22s %s\n     bib now : %s\n     title   : %s\n" % (

@@ -221,6 +221,21 @@ check("keeps title when head is a bare name", V.short_query(
     'LongLive: Real-time Interactive Long Video Generation')
 
 
+# ------------------------------------------------------- anchors vs. rate limit
+section("anchor_flag — a lookup that never ran is not a lookup that found nothing")
+check("anchored entry is silent",
+      V.anchor_flag(['arxiv:2606.17800'], []), "")
+check("anchored wins even if some other source errored",
+      V.anchor_flag(['openreview', 'aminer'], ['HTTPError:HTTP Error 429']), "")
+check("no anchor, no error -> genuinely unfound, read the paper",
+      '🔴' in V.anchor_flag([], []), True)
+check("no anchor because 429 -> says unverified, not unfound",
+      '🟡' in V.anchor_flag([], ['HTTPError:HTTP Error 429: Too Many Requests']), True)
+check("a rate-limited entry is never called 查无此文",
+      '🔴' in V.anchor_flag([], ['TimeoutError:The read operation timed out']), False)
+check("None anchors behaves like empty",
+      '🟡' in V.anchor_flag(None, ['HTTPError:HTTP Error 429']), True)
+
 # --------------------------------------------------------------------- report
 print("\n%s" % ("=" * 52))
 if FAIL:
