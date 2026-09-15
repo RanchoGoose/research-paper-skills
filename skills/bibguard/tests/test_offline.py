@@ -207,6 +207,68 @@ check("no venue -> @article + arXiv", p.startswith('@article{foo2026,'), True)
 check("journal is the arXiv line", 'journal = {arXiv preprint arXiv:2601.00001}' in p, True)
 check("no empty fields emitted", '{}' in p, False)
 
+section("--add: corporate author — 'Gemma Team' is one author, not 'Team, Gemma'")
+g = V.render_entry('gemma2026', 'Gemma 4 Technical Report',
+                   ['Gemma Team', 'Sherif El Abd', 'Vaibhav Aggarwal'], '2026', None, '2607.02770')
+check("team braced as the author", 'author  = {{Gemma Team}}' in g, True)
+check("team key uses the team name", V.make_key('Gemma 4 Technical Report', '2026', set(),
+                                                ['Gemma Team', 'Sherif El Abd']), 'gemma2026')
+check("a person is still inverted", 'Park, Joon Sung' in V.render_entry(
+    'x2023', 'X', ['Joon Sung Park'], '2023', None, None), True)
+
+section("--add: AMiner paper/info writes the entry (authors, year, arXiv id)")
+rec = V.aminer_info_parse({'success': True, 'data': [{
+    'id': '6528a864939a5f408257a128', 'title': 'MemGPT: Towards LLMs As Operating Systems',
+    'authors': [{'name': 'Charles Packer'}, {'name': 'Sarah  Wooders'}, {}],
+    'year': 2023, 'doi': '10.48550/arxiv.2310.08560'}]})
+check("full author list, blanks dropped", rec['authors'], ['Charles Packer', 'Sarah Wooders'])
+check("year as string", rec['year'], '2023')
+check("arXiv id from the DataCite DOI", rec['arxiv'], '2310.08560')
+rec2 = V.aminer_info_parse({'success': True, 'data': [{
+    'id': 'x', 'title': 'Generative Agents', 'authors': [{'name': 'Joon Sung Park'}],
+    'year': 2023, 'venue': {'raw': 'UIST'}, 'doi': '10.1145/3586183.3606763'}]})
+check("venue raw unwrapped", rec2['venue'], 'UIST')
+check("no arXiv id from a publisher DOI", rec2['arxiv'], None)
+check("failed response -> None", V.aminer_info_parse({'success': False, 'data': []}), None)
+
+section("--add: aminer_queries — AMiner misses titles with math, finds the words after the colon")
+check("full, plain, tail", V.aminer_queries('A$^2$RD: Agentic Autoregressive Diffusion for Long Video'),
+      ['A$^2$RD: Agentic Autoregressive Diffusion for Long Video',
+       'A2RD: Agentic Autoregressive Diffusion for Long Video',
+       'Agentic Autoregressive Diffusion for Long Video'])
+check("plain title not repeated", V.aminer_queries('Gemma 4 Technical Report'),
+      ['Gemma 4 Technical Report'])
+check("too-short tail skipped", V.aminer_queries('MemGPT: Towards LLMs'), ['MemGPT: Towards LLMs'])
+
+section("--add: arxiv.org/abs meta tags stand in for a rate-limited API")
+page = ('<meta name="citation_title" content="A$^2$RD: Agentic Autoregressive Diffusion" />'
+        '<meta name="citation_author" content="Long, Do Xuan" />'
+        '<meta name="citation_author" content="Song, Yale" />'
+        '<meta name="citation_date" content="2026/05/07" />')
+ab = V.arxiv_abs_parse(page)
+check("title kept with its math", ab['title'], 'A$^2$RD: Agentic Autoregressive Diffusion')
+check("authors already inverted", ab['authors'], ['Long, Do Xuan', 'Song, Yale'])
+check("year from citation_date", ab['year'], '2026')
+check("no meta -> None", V.arxiv_abs_parse('<html></html>'), None)
+
+section("--add: fix_caret — a bare ^ from AMiner would break LaTeX")
+check("caret wrapped in math", V.fix_caret('A^2RD: Agentic'), 'A$^2$RD: Agentic')
+check("existing math untouched", V.fix_caret('A$^2$RD: Agentic'), 'A$^2$RD: Agentic')
+check("key from the fixed title", V.make_key(V.fix_caret('A^2RD: Agentic'), '2026', set()),
+      'a2rd2026')
+
+section("--add: doi.org CSL gives authors and year (a DOI add once wrote neither)")
+au, yr = V.csl_authors_year({'author': [{'given': 'Joon Sung', 'family': 'Park'},
+                                         {'literal': 'OpenAI'}, {'family': 'Plato'}],
+                             'issued': {'date-parts': [[2023, 10, 29]]}})
+check("family, given", au, ['Park, Joon Sung', 'OpenAI', 'Plato'])
+check("year", yr, '2023')
+check("empty record", V.csl_authors_year({}), ([], None))
+check("UIST is a main venue", bool(V.MAIN_VENUE.match('UIST')), True)
+check("UIST canonical", V.canon_venue(
+    'Proceedings of the 36th Annual ACM Symposium on User Interface Software and Technology')[0],
+    'UIST')
+
 section("short_query — OpenReview ranks badly on very long terms")
 # The 12-word cap is the fix: a full 20-word title returns records with
 # venue=None and buries the real hit past the result limit.

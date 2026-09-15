@@ -144,8 +144,8 @@ $ python3 $S references.bib --add "LongLive: Real-time Interactive Long Video Ge
 
 | 源 | 端点 | 覆盖 | 不可替代之处 |
 |---|---|---|---|
-| **AMiner** ⭐主 | `datacenter.aminer.cn/.../paper/search` | 几乎所有 venue,含 CMT 系会议 | ⭐ **主出处源。** CVPR/ICCV 不进 OpenReview,proceedings 出版前也没有 DOI —— **有好几个月,只有它知道这篇中了**。云主机上通(实测 200),正好补上 DBLP 被封的那块。需免费 key |
-| **arXiv API** | `export.arxiv.org/api/query` | title / authors / 日期 | 唯一权威的作者与标题来源,能发现论文改名 |
+| **AMiner** ⭐主 | `datacenter.aminer.cn/.../paper/search` + `paper/info` | 几乎所有 venue,含 CMT 系会议;arXiv 预印本也收 | ⭐ **主出处源。** CVPR/ICCV 不进 OpenReview,proceedings 出版前也没有 DOI —— **有好几个月,只有它知道这篇中了**。云主机上通(实测 200),正好补上 DBLP 被封的那块。⭐ **`--add` 的作者与年份也由它写**:`paper/search` 标题相似度 ≥ 0.90 命中后,`paper/info` 给完整作者列表、年份、venue,arXiv 预印本的 arXiv id 从它的 DataCite DOI(`10.48550/arxiv.*`)取。需免费 key |
+| **arXiv API** | `export.arxiv.org/api/query` | title / authors / 日期 | 唯一权威的标题来源,能发现论文改名。`--add` 时被 429 就改读 `arxiv.org/abs/<id>` 页的 `citation_*` 元数据(两者分开限流,实测 API 429 时 abs 页 200) |
 | **OpenReview API2** | `api2.openreview.net/notes/search` | **ICLR / ICML / NeurIPS / COLM** | ⭐ 这些会议**不发 DOI**,Crossref 和 OpenAlex 一律查不到;精确到 `ICLR 2026 Oral` |
 | **Crossref** | `api.crossref.org/works` | 任何有 DOI 的 | 有 DOI 的都在这儿,顺带拿回 DOI |
 | **doi.org 解析** | `doi.org` 内容协商 | **任何注册过 DOI 的东西** | ⭐ 不依赖出版商:按 DOI 直接向注册机构取回权威标题与出处。**没上过 arXiv、没走过 OpenReview 的论文,这是唯一的机器锚点** |
@@ -154,7 +154,9 @@ $ python3 $S references.bib --add "LongLive: Real-time Interactive Long Video Ge
 arXiv / OpenReview / Crossref / doi.org 全部免 key 免注册;AMiner 需一个免费 key。
 **全部**按标题相似度校验(>0.80)防错配。
 
-**「以 AMiner 为主」是有边界的:它只决定选哪个 venue,不决定细节。**
+**`--add` 的条目由 AMiner 写**:作者与年份先取 AMiner,arXiv / doi.org 只补它缺的;标题优先用 arXiv 的原文(带 `$^2$` 这类数学),只有 AMiner 时把裸 `^` 包进数学。任何来源都给不出作者或年份,就拒绝写入——没有作者的条目等于没核实。
+
+**「以 AMiner 为主」在选出处时有边界:它只决定选哪个 venue,不决定细节。**
 选定 venue 之后,脚本会回头在**所有认同同一个 venue 的源**里捞:
 DOI 从 Crossref 拿,录用等级(`Oral` / `spotlight`)从 OpenReview 拿。
 **以某个源为主,不等于丢掉只有别的源才有的信息。**

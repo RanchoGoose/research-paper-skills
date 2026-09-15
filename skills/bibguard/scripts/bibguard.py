@@ -4,8 +4,10 @@ bibguard.py — 写 paper 时的引用总管:加引用、查引用、统一格�
 
 五个源分工(以 AMiner 为主,其余补它拿不到的细节):
   AMiner      -> 出处主源。CVPR 这类走 CMT 的会议不进 OpenReview、
-                 proceedings 出版前也没有 DOI,只有它知道这篇中了
-  arXiv API   -> title / authors / 日期。唯一权威的标题来源,能发现论文改名
+                 proceedings 出版前也没有 DOI,只有它知道这篇中了。
+                 --add 时也是作者与年份的主源(paper/info 给完整作者列表)
+  arXiv API   -> title / authors / 日期。唯一权威的标题来源,能发现论文改名;
+                 API 被 429 时 --add 改读 arxiv.org/abs 页的 citation_* 元数据
   OpenReview  -> ICLR / ICML / NeurIPS / COLM 录用状态与等级(这些会议不发 DOI,
                  Crossref 与 OpenAlex 都查不到)
   Crossref    -> 任何有 DOI 的,顺带把 DOI 带回来
@@ -43,7 +45,7 @@ CACHE_V = 3
 # ("2025 IEEE/CVF Conference on ... (CVPR)"),所以允许前导年份。
 MAIN_VENUE = re.compile(
     r'^\s*(\d{4}\s+)?(ICLR|ICML|NeurIPS|NIPS|CVPR|ICCV|ECCV|ACL|EMNLP|NAACL|COLING|AAAI|'
-    r'IJCAI|SIGGRAPH|HPCA|ISCA|MICRO|ASPLOS|OSDI|SOSP|NSDI|MLSys|COLM|WACV|BMVC|'
+    r'IJCAI|SIGGRAPH|UIST|HPCA|ISCA|MICRO|ASPLOS|OSDI|SOSP|NSDI|MLSys|COLM|WACV|BMVC|'
     r'IEEE|ACM|Proceedings|Advances\s+in\s+Neural|International\s+Conference|'
     r'Transactions\s+on|Journal\s+of|Nature|Science)\b', re.I)
 # 明确不算发表的状态串(会触发 WORKSHOP_OR_REJECTED 告警)
@@ -70,6 +72,7 @@ def sim(a, b):
 # arXiv asks for >=3s; the rest are set from observed limits.
 HOST_GAP = {
     'export.arxiv.org': 4.0,
+    'arxiv.org': 4.0,
     'api2.openreview.net': 2.0,
     'api.crossref.org': 1.5,
     'datacenter.aminer.cn': 1.0,
@@ -317,6 +320,156 @@ def q_aminer(title, key):
     return {'err': None, 'venues': v}
 
 
+def aminer_info_parse(d):
+    """paper/info response -> the fields --add needs, or None.
+
+    The search endpoint names only the first author; the full author list, the
+    year and the venue come from paper/info, whose ids go in a JSON body (the
+    opposite of search). arXiv-only papers carry their DataCite DOI
+    (10.48550/arxiv.NNNN.NNNNN), which is where the arXiv id comes from.
+    """
+    rows = (d or {}).get('data') or []
+    if not (d or {}).get('success') or not rows or not isinstance(rows[0], dict):
+        return None
+    it = rows[0]
+    names = [' '.join(str(a.get('name') or '').split())
+             for a in (it.get('authors') or []) if isinstance(a, dict)]
+    doi = str(it.get('doi') or '')
+    m = re.search(r'10\.48550/arxiv\.(\d{4}\.\d{4,5})', doi, re.I)
+    ven = it.get('venue')
+    ven = ven.get('raw') if isinstance(ven, dict) else ven
+    return {'id': it.get('id'), 'title': ' '.join(str(it.get('title') or '').split()),
+            'authors': [n for n in names if n], 'year': str(it.get('year') or ''),
+            'venue': ven or None, 'doi': doi or None,
+            'arxiv': m.group(1) if m else None}
+
+
+def aminer_queries(title):
+    """Search strings to try, most specific first.
+
+    AMiner's title search returns nothing for "A$^2$RD: Agentic ..." and also
+    for its own stored "A^2RD: ..." spelling, yet finds the paper from the words
+    after the colon. Every hit is still gated on the *full* title afterwards.
+    """
+    plain = ' '.join(re.sub(r'[$^{}\\]', '', title).split())
+    tail = plain.split(':', 1)[1].strip() if ':' in plain else ''
+    out = []
+    for q in (title, plain, tail):
+        if q and len(q.split()) >= 3 and q not in out:
+            out.append(q)
+    return out
+
+
+def q_aminer_record(title, key):
+    """AMiner as the source of the entry itself: title match, then full record.
+
+    --add used to take authors and year from the arXiv API alone, so one 429
+    there refused every arXiv-only paper although AMiner indexes them. The hit
+    must match the title closely (>= 0.90): a near-miss would put the wrong
+    authors on a real title, which is worse than refusing.
+    """
+    if not key or not title:
+        return {'err': 'no-key' if not key else 'no-title'}
+    hdr = {'User-Agent': UA, 'X-Platform': 'openclaw', 'Authorization': 'Bearer ' + key}
+    hit = None
+    for q in aminer_queries(title):
+        u = ("https://datacenter.aminer.cn/gateway/open_platform/api/paper/search?"
+             + urllib.parse.urlencode({'title': q, 'page': 0, 'size': 5}))
+        for i in range(3):
+            throttle(u)
+            try:
+                with urllib.request.urlopen(urllib.request.Request(u, headers=hdr),
+                                            timeout=40) as r:
+                    d = json.loads(r.read().decode('utf-8', 'replace'))
+                hits = sorted((it for it in (d.get('data') or []) if isinstance(it, dict)),
+                              key=lambda it: -sim(title, it.get('title', '')))
+                if hits and sim(title, hits[0].get('title', '')) >= 0.90:
+                    hit = hits[0]
+                break
+            except Exception as e:
+                if i == 2:
+                    return {'err': '%s:%s' % (type(e).__name__, str(e)[:40])}
+                backoff(e, i, 4)
+        if hit:
+            break
+    if not hit or not hit.get('id'):
+        return {'err': 'aminer:no-title-match'}
+    u2 = "https://datacenter.aminer.cn/gateway/open_platform/api/paper/info"
+    body = json.dumps({'ids': [hit['id']]}).encode()
+    rec = None
+    for i in range(3):
+        throttle(u2)
+        try:
+            req = urllib.request.Request(u2, data=body, method='POST', headers=dict(
+                hdr, **{'Content-Type': 'application/json'}))
+            with urllib.request.urlopen(req, timeout=60) as r:
+                rec = aminer_info_parse(json.loads(r.read().decode('utf-8', 'replace')))
+            break
+        except Exception as e:
+            if i == 2:
+                return {'err': '%s:%s' % (type(e).__name__, str(e)[:40])}
+            backoff(e, i, 4)
+    if not rec or sim(title, rec['title']) < 0.90:
+        return {'err': 'aminer:info-mismatch'}
+    rec['err'] = None
+    return rec
+
+
+def arxiv_abs_parse(page):
+    """citation_* meta tags of an arxiv.org/abs page -> title, authors, year."""
+    import html
+    def metas(name):
+        return [html.unescape(m) for m in re.findall(
+            r'<meta\s+name="%s"\s+content="([^"]*)"' % name, page or '')]
+    ti, dt = metas('citation_title'), metas('citation_date')
+    if not ti:
+        return None
+    return {'title': ' '.join(ti[0].split()),
+            'authors': [' '.join(a.split()) for a in metas('citation_author')],
+            'year': dt[0][:4] if dt else None}
+
+
+def q_arxiv_abs(aid):
+    """The arxiv.org/abs page, for when the export API answers 429.
+
+    The two are rate-limited separately (2026-09-15: the API returned 429 while
+    abs pages returned 200), and the page carries the same title and date.
+    """
+    u = "https://arxiv.org/abs/%s" % aid
+    miss = {'title': None, 'authors': None, 'year': None, 'id': aid, 'jref': None}
+    throttle(u)
+    try:
+        with urllib.request.urlopen(urllib.request.Request(u, headers={'User-Agent': UA}),
+                                    timeout=40) as r:
+            got = arxiv_abs_parse(r.read().decode('utf-8', 'replace'))
+    except Exception as e:
+        return dict(miss, err='%s:%s' % (type(e).__name__, str(e)[:40]))
+    if not got:
+        return dict(miss, err='abs:no-meta')
+    got.update(err=None, id=aid, jref=None)
+    return got
+
+
+def fix_caret(title):
+    """AMiner flattens A$^2$RD to A^2RD, and a bare ^ breaks LaTeX in a title."""
+    if '$' in title:
+        return title
+    return re.sub(r'\^(\{[^}]*\}|\w)', lambda m: '$^%s$' % m.group(1), title)
+
+
+def csl_authors_year(d):
+    """doi.org CSL-JSON -> (["Family, Given", ...], "YYYY" or None)."""
+    au = []
+    for a in (d or {}).get('author') or []:
+        if a.get('literal'):
+            au.append(a['literal'])
+        elif a.get('family'):
+            au.append('%s, %s' % (a['family'], a['given']) if a.get('given') else a['family'])
+    parts = ((d or {}).get('issued') or {}).get('date-parts') or [[None]]
+    y = parts[0][0] if parts and parts[0] else None
+    return au, (str(y) if y else None)
+
+
 def dblp_reachable(timeout=6):
     """DBLP is a 4th cross-check, but it refuses most cloud egress IPs.
 
@@ -355,13 +508,15 @@ def q_doi(doi, title):
             d = json.loads(r.read().decode('utf-8', 'replace'))
     except Exception as e:
         return {'err': '%s:%s' % (type(e).__name__, str(e)[:40]),
-                'ok': False, 'title': None, 'venue': None}
+                'ok': False, 'title': None, 'venue': None, 'authors': None, 'year': None}
     ti = d.get('title')
     ti = ti[0] if isinstance(ti, list) and ti else ti
     ven = d.get('container-title')
     ven = ven[0] if isinstance(ven, list) and ven else ven
-    return {'err': None, 'ok': bool(ti) and sim(title, ti) >= 0.80,
-            'title': ti, 'venue': ven}
+    au, yr = csl_authors_year(d)
+    # --add by DOI passes no title: the DOI itself is the match, as with an arXiv id.
+    return {'err': None, 'ok': bool(ti) and (not title or sim(title, ti) >= 0.80),
+            'title': ti, 'venue': ven, 'authors': au or None, 'year': yr}
 
 
 def q_dblp(title):
@@ -633,6 +788,11 @@ def protect_caps(title):
     return ' '.join(one(t) for t in title.split())
 
 
+# "Gemma Team" is one author, not "Team, Gemma"; its report lists hundreds of
+# people after it, and the citable author is the team.
+CORP_AUTHOR = re.compile(r'\s+(Team|Consortium|Collaboration)$')
+
+
 def make_key(title, year, taken, authors=None):
     """Key in the same shape the rest of the bibliography uses.
 
@@ -647,7 +807,10 @@ def make_key(title, year, taken, authors=None):
     if ':' in title and len(head.split()) <= 4:
         slug = re.sub(r'[^a-z0-9]', '', head.lower())
     if not slug and authors:
-        slug = re.sub(r'[^a-z0-9]', '', bib_author(authors[0]).split(',')[0].lower())
+        first = ' '.join(str(authors[0]).split())
+        corp = CORP_AUTHOR.search(first)
+        slug = re.sub(r'[^a-z0-9]', '', (first[:corp.start()] if corp else
+                                         bib_author(first).split(',')[0]).lower())
     if not slug:                       # no colon, no authors: first two words
         slug = re.sub(r'[^a-z0-9]', '', ' '.join(title.split()[:2]).lower())
     base = '%s%s' % (slug[:24] or 'ref', year or '')
@@ -669,7 +832,9 @@ def render_entry(key, title, authors, year, venue_act, arxiv_id):
         vvalue = 'arXiv preprint arXiv:%s' % arxiv_id if arxiv_id else ''
         note = ''
     rows = [('title', protect_caps(title)),
-            ('author', ' and '.join(bib_author(a) for a in (authors or []))),
+            ('author', ('{%s}' % ' '.join(str(authors[0]).split()))
+             if authors and CORP_AUTHOR.search(' '.join(str(authors[0]).split()))
+             else ' and '.join(bib_author(a) for a in (authors or []))),
             (vfield, vvalue), ('year', str(year or '')), ('note', note)]
     rows = [(k, v) for k, v in rows if v]
     w = max(len(k) for k, _ in rows)
@@ -692,18 +857,27 @@ def cmd_add(bib_path, query, am_key, use_dblp, dry_run):
 
     ax = q_arxiv(stub) if not doi else {'title': None, 'authors': None,
                                         'year': None, 'id': None, 'err': 'skipped'}
+    if aid and not ax.get('title'):
+        # Export API rate-limited: the abs page is limited separately.
+        ab = q_arxiv_abs(aid.group(1))
+        if ab.get('title'):
+            ax = ab
     dv = q_doi(doi.group(1), '') if doi else None
     title = ax.get('title') or (dv or {}).get('title')
+    # AMiner writes the entry: its full author list and year come first, and
+    # arXiv / doi.org fill in only what it lacks.
+    rec = q_aminer_record(title or stub['title'], am_key) if am_key else None
+    arec = rec if rec and not rec.get('err') else {}
+    if not title and arec:
+        title = fix_caret(arec['title'])
     if not title:
         print("✗ 查不到这篇:%s" % q)
         print("  arXiv / DOI 都没有命中。换个更准确的标题,或直接给 arXiv id / DOI。")
         print("  没有任何来源能证实的条目,不会写进 .bib —— 这正是这个工具存在的理由。")
         return 2
 
-    authors = ax.get('authors')
-    if not authors and dv:
-        authors = dv.get('authors')
-    arxiv_id = ax.get('id')
+    authors = arec.get('authors') or ax.get('authors') or (dv or {}).get('authors')
+    arxiv_id = ax.get('id') or arec.get('arxiv')
 
     orv = q_openreview(title)
     cr = q_crossref(title)
@@ -720,15 +894,20 @@ def cmd_add(bib_path, query, am_key, use_dblp, dry_run):
         anchors.append('openreview')
     if any(x.startswith(('CR:', 'DBLP:')) for x in ev):
         anchors.append('crossref/dblp')
-    if any(x.startswith('AMINER:') for x in ev):
+    if any(x.startswith('AMINER:') for x in ev) or arec:
         anchors.append('aminer')
     if not anchors:
         print("✗ 找到了标题,但没有任何独立来源能证实它:%s" % title)
         print("  不写入。请人工核对原文后手写这一条。")
         return 2
 
-    venue_act = pick_venue(suggest, ax.get('year'), arxiv_id) if suggest else None
-    year = (venue_act or {}).get('year') or ax.get('year') or ''
+    bib_year = arec.get('year') or ax.get('year') or (dv or {}).get('year')
+    venue_act = pick_venue(suggest, bib_year, arxiv_id) if suggest else None
+    year = (venue_act or {}).get('year') or bib_year or ''
+    if not authors or not str(year).strip():
+        print("✗ 没有来源给出作者或年份,不写入:%s" % title)
+        print("  没有作者或年份的条目等于没核实。确认 AMiner key 可用,或换 arXiv id / 标题重试。")
+        return 2
 
     existing = parse_bib(bib_path)
     dup = next((e for e in existing if sim(e['title'], title) >= 0.90), None)
@@ -742,6 +921,8 @@ def cmd_add(bib_path, query, am_key, use_dblp, dry_run):
     entry = render_entry(key, title, authors, year, venue_act, arxiv_id)
 
     print("标题  : %s" % title)
+    print("作者  : %d 位,来自 %s" % (len(authors), 'AMiner' if arec.get('authors') else
+                                    ('arXiv' if ax.get('authors') else 'doi.org')))
     print("出处  : %s" % ((venue_act or {}).get('book') or
                           ('arXiv preprint arXiv:%s' % arxiv_id if arxiv_id else '(无)')))
     print("锚点  : %s" % ', '.join(anchors))

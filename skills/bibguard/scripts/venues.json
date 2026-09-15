@@ -89,6 +89,14 @@
    "siggraph asia"
   ]
  },
+ "UIST": {
+  "kind": "conf",
+  "book": "Proceedings of the ACM Symposium on User Interface Software and Technology (UIST)",
+  "match": [
+   "uist",
+   "user interface software and technology"
+  ]
+ },
  "ACL": {
   "kind": "conf",
   "book": "Proceedings of the Annual Meeting of the Association for Computational Linguistics (ACL)",

@@ -107,8 +107,8 @@ never cached as findings; they are re-queried on the next run.
 
 | Source | Covers | Why it is there |
 |---|---|---|
-| **AMiner** | Almost every venue, including CMT-run conferences | The primary venue source. CVPR and ICCV are not on OpenReview and have no DOI until the proceedings ship, so for months this is the only source that knows a paper was accepted. Needs a free key. |
-| **arXiv** | Title, authors, dates | The authoritative title, which is how renamed papers are caught. |
+| **AMiner** | Almost every venue, including CMT-run conferences, and arXiv preprints | The primary venue source. CVPR and ICCV are not on OpenReview and have no DOI until the proceedings ship, so for months this is the only source that knows a paper was accepted. For `--add` it also writes the entry: a title match of at least 0.90 in `paper/search`, then `paper/info` for the full author list, the year and the venue. Needs a free key. |
+| **arXiv** | Title, authors, dates | The authoritative title, which is how renamed papers are caught. When the export API answers 429, `--add` reads the `citation_*` meta tags of the `arxiv.org/abs` page, which is rate-limited separately. |
 | **OpenReview** | ICLR, ICML, NeurIPS, COLM | Those venues issue no DOI, so Crossref and OpenAlex cannot see them. Also gives the decision grade. |
 | **Crossref** | Anything with a DOI | Returns the DOI itself. |
 | **doi.org** | Anything registered anywhere | Publisher-independent content negotiation, and the only machine anchor for a paper that was never on arXiv and never went through OpenReview. |
@@ -118,6 +118,8 @@ arXiv, OpenReview, Crossref and doi.org need no key and no registration. AMiner
 needs a free key; without one it is skipped and the other four still work. Every
 source is gated on a title similarity above 0.80, so a near miss is never
 silently attributed.
+
+**`--add` takes authors and year from AMiner first**, and arXiv or doi.org only fill what it lacks. An entry that no source gives authors and a year for is refused.
 
 **AMiner decides which venue, but never the details.** The DOI is still
 harvested from Crossref and the acceptance grade (`Oral`, `spotlight`) from
