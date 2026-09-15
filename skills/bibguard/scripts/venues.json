@@ -82,6 +82,13 @@
    "siggraph"
   ]
  },
+ "SIGGRAPH Asia": {
+  "kind": "conf",
+  "book": "Proceedings of the SIGGRAPH Asia Conference Papers",
+  "match": [
+   "siggraph asia"
+  ]
+ },
  "ACL": {
   "kind": "conf",
   "book": "Proceedings of the Annual Meeting of the Association for Computational Linguistics (ACL)",
