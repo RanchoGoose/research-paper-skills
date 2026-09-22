@@ -2,18 +2,19 @@
 
 Writing rules for a research paper, and `paperlint`, the command that enforces
 the measurable half of them. The rules (in `SKILL.md`, Chinese) are the
-author's house style: outline before prose, one idea per paragraph, every
-sentence with a purpose and a source, every symbol defined before use, a fixed
-four-part abstract, a three-paragraph introduction, a figure in each of the
-first three sections, every result in a table, no code paths in the body, and
-an appendix that starts on its own page, under a title carrying the paper's
-own, with its floats renumbered under their appendix section (Table A.1, not
-Table 18), in at most 20 pages. A section on typesetting covers the parts a reader
-sees before they read a word: caption skips set per float type (a table's
-caption sits above it and a figure's below, so one global pair cannot serve
-both), figure widths and trims measured rather than guessed, and the order to
-tighten a page in -- float separations, then `\bibsep`, then a negative
-`\vspace`, and only then a sentence.
+author's house style, written as a template that says what every paragraph of
+every section is for: outline before prose, one idea per paragraph, every
+sentence with a purpose and a source, only the field's own terms (no coined
+nouns), numbers in tables and directions in prose, a fixed five-step abstract,
+a three-paragraph introduction with three one-sentence contributions, one
+distinct job per table with the method's rows shaded, captions that open with
+the conclusion, an appendix that follows the order of the main text and only
+supplements it, and a main text that ends on the last line of the page limit.
+A section on typesetting covers what a reader sees before reading a word:
+caption skips set per float type, figure widths and trims measured rather than
+guessed, wrapped tables placed where they cannot fall off the page, and the
+order to tighten a page in -- float separations, then `\bibsep`, and only then
+a sentence.
 
 ```bash
 python3 scripts/paperlint.py main.tex --outline OUTLINE.md

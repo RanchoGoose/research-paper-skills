@@ -7,7 +7,7 @@ checked: the bibliography, the manuscript, and the review.
 |---|---|
 | [**bibguard**](skills/bibguard/) | Verify that every citation exists, recover where it was really published, add new entries only after checking them, and put the whole `.bib` in one format. |
 | [**iclr-paper-review**](skills/iclr-paper-review/) | Review a machine-learning paper against a strict ICLR-style rubric: novelty, claim-to-evidence, equations, every figure and table, experimental sufficiency, and one calibrated 1–10 score. |
-| [**paper-writing**](skills/paper-writing/) | The writing rules — outline before prose, one idea per paragraph, every claim with its evidence — plus `paperlint`, which turns the measurable ones into a command with an exit code. |
+| [**paper-writing**](skills/paper-writing/) | The writing rules as a per-section template — outline before prose, numbers in tables, every claim with its evidence — plus `paperlint`, which turns the measurable ones into a command with an exit code. |
 
 Each skill is self-contained and can be installed on its own. None of them
 invokes or depends on another.
@@ -107,29 +107,43 @@ The rubric and the specialized audit procedures live in
 
 ## paper-writing
 
-The writing counterpart of the review skill: house rules for producing the
-manuscript, and a linter for the measurable half of them.
+The writing counterpart of the review skill: a per-section template for
+producing the manuscript, and a linter for the measurable half of it.
 
-- **Outline first.** No change to the paper, down to a sentence, without first
+- **Outline first.** No change to the paper, down to a word, without first
   checking and changing the outline. The outline carries a storyline with a
   claim-to-evidence table, and a link with no evidence is not written.
-- Every sentence has a purpose and a source, facts stay apart from opinions,
-  nothing is said twice, and the shorter version wins.
-- One idea per paragraph; the first paragraph of a section summarises it.
-- Every term is defined or cited, and every symbol and abbreviation is defined
-  before use.
-- A fixed abstract of at most 300 words, a three-paragraph introduction, one
-  paragraph per category in related work, and every citation through `bibguard`.
-- A framework figure in the method, a figure in each of the first three
-  sections, every number in a table, an ablation, recent baselines.
-- No code paths, script names or flags in the body. The appendix is at most 20
-  pages, starts on its own page under a title carrying the paper's own, and
-  renumbers its floats per appendix section — Table A.1, not Table 18, so the
-  number says which appendix to open.
-- Typesetting is what a reader sees before reading a word: caption skips set per
-  float type, figure widths and trims measured rather than guessed, and a fixed
-  order for tightening a page — float separations, then `\bibsep`, then a
-  negative `\vspace`, and only then a sentence.
+- **Conclusions follow the data.** A standing conclusion may be wrong; the
+  idea and the headline claim can change, but the change lands in the outline
+  first.
+- Every sentence has a purpose and a source, nothing is said twice, and the
+  shorter version wins. Edits go sentence by sentence, never as a wholesale
+  rewrite, and a sentence the author wrote by hand stays verbatim.
+- Written for a reader with no prior: terms of the field only, no coined
+  nouns, every symbol and abbreviation defined before use, plain sentences
+  without colons, and the register reviewers expect in each section.
+- Numbers live in tables and come from generated macros; prose gives the
+  direction of a result and the table it sits in. No bare numbers and no
+  "Δ [lo, hi]" intervals in prose.
+- A template per section: a five-step abstract, a three-paragraph
+  introduction with three one-sentence contributions, one paragraph per
+  category in related work, a framework figure in the method, and in the
+  experiments a settings paragraph, one job per table, a two-block ablation,
+  a qualitative figure chosen by eye and a cost table.
+- Tables and figures: Base and +Method rows paired with the method's rows
+  shaded, bold for the best per column, no N/A, small tables wrapped beside
+  the text, a curve instead of a table where a quantity varies along an axis,
+  and every caption opening with a one-sentence bold highlight.
+- No code paths, script names or flags in the body. The appendix follows the
+  order of the main text, opens each section by naming what it supplements,
+  repeats a number only as the same macro, is at most 20 pages, starts on its
+  own page under a title carrying the paper's own, and renumbers its floats
+  per appendix section.
+- Typesetting: the template's own fonts and spacing, no `\vspace`, caption
+  skips set per float type, figure widths and trims measured rather than
+  guessed, a page tightened by float separations, then `\bibsep`, then
+  repeated sentences, and the main text filled to the last line of its page
+  limit.
 
 `paperlint` enforces what can be enforced and exits with the number of hard
 failures:
