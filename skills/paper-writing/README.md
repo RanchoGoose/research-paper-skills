@@ -3,18 +3,18 @@
 Writing rules for a research paper, and `paperlint`, the command that enforces
 the measurable half of them. The rules (in `SKILL.md`, Chinese) are the
 author's house style, written as a template that says what every paragraph of
-every section is for: outline before prose, one idea per paragraph, every
-sentence with a purpose and a source, only the field's own terms (no coined
-nouns), numbers in tables and directions in prose, a fixed five-step abstract,
-a three-paragraph introduction with three one-sentence contributions, one
-distinct job per table with the method's rows shaded, captions that open with
-the conclusion, an appendix that follows the order of the main text and only
-supplements it, and a main text that ends on the last line of the page limit.
-A section on typesetting covers what a reader sees before reading a word:
-caption skips set per float type, figure widths and trims measured rather than
-guessed, wrapped tables placed where they cannot fall off the page, and the
-order to tighten a page in -- float separations, then `\bibsep`, and only then
-a sentence.
+every section is for: outline before prose, every sentence with a purpose and
+a source, only the field's own terms, numbers in tables and directions in
+prose, a fixed five-step abstract, a three-paragraph introduction with three
+one-sentence contributions, one distinct job per table with the method's rows
+shaded, an ablation marked by daggers rather than bold, a qualitative figure
+with at least two cases that show different things, a cost section that
+separates work on the generation path from work that runs beside it, captions
+that open with the conclusion, an appendix that follows the order of the main
+text, and a main text that ends on the last line of the page limit. The
+typesetting section fixes the one mistake that kept coming back: the caption
+must sit close to its own float and the float close to the text, 7pt and 10pt,
+set per float type including wrapped floats, never with `\vspace`.
 
 ```bash
 python3 scripts/paperlint.py main.tex --outline OUTLINE.md

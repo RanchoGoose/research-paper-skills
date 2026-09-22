@@ -139,11 +139,12 @@ producing the manuscript, and a linter for the measurable half of it.
   repeats a number only as the same macro, is at most 20 pages, starts on its
   own page under a title carrying the paper's own, and renumbers its floats
   per appendix section.
-- Typesetting: the template's own fonts and spacing, no `\vspace`, caption
-  skips set per float type, figure widths and trims measured rather than
-  guessed, a page tightened by float separations, then `\bibsep`, then
-  repeated sentences, and the main text filled to the last line of its page
-  limit.
+- Typesetting: the template's own fonts and spacing, no `\vspace`; the
+  caption close to its own float and the float close to the text (7pt and
+  10pt, set per float type, wrapped floats included), figure widths and trims
+  measured rather than guessed, a page tightened by float separations, then
+  `\bibsep`, then repeated sentences, and the main text filled to the last
+  line of its page limit.
 
 `paperlint` enforces what can be enforced and exits with the number of hard
 failures:
