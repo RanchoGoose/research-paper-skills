@@ -152,14 +152,18 @@ def parse_bib(path):
             continue
         blob = ' '.join([f.get('journal', ''), f.get('note', ''), f.get('doi', '')])
         dm = re.search(r'\b(10\.\d{4,9}/[^\s;,}]+)', blob)
+        # DOI 里的数字不是 arXiv id:doi:10.1109/cvpr52734.2025.00245 曾被读成
+        # arXiv:2734.2025,--fix 还把它写进了 note。arXiv 自己的 DataCite DOI
+        # (10.48550/arxiv.NNNN.NNNNN)除外,那里的数字就是 id。
+        ax_blob = re.sub(r'\b10\.(?!48550/arxiv\.)\d{4,9}/[^\s;,}]+', ' ',
+                         f.get('journal', '') + ' ' + f.get('note', ''), flags=re.I)
+        am = re.search(r'(\d{4}\.\d{4,5})', ax_blob)
         entries.append(dict(
             key=key, type=typ, doi=dm.group(1) if dm else None,
             title=re.sub(r'[{}\\]', '', f['title']),
             year=f.get('year', '?'),
             current=f.get('booktitle') or f.get('journal') or '?',
-            arxiv=(re.search(r'(\d{4}\.\d{4,5})', f.get('journal', '') + ' ' + f.get('note', ''))
-                   or [None, None])[1] if re.search(
-                       r'(\d{4}\.\d{4,5})', f.get('journal', '') + ' ' + f.get('note', '')) else None,
+            arxiv=am.group(1) if am else None,
         ))
     return entries
 
@@ -600,6 +604,50 @@ def merge_note(old, new):
 
 
 # ---------------------------------------------------------------- classify
+def or_refused(or_venues):
+    """OpenReview 记为撤稿/拒稿/在投的 (venue 缩写, 年份) 集合。
+
+    实测 StreamingT2V:OpenReview 上是 "ICLR 2025 Conference Withdrawn Submission",
+    AMiner 却给了一条光秃秃的 "ICLR 2025"(还挂着 CVPR 的 DOI)。AMiner 排第一,
+    --add 就写成了 ICLR,--fix 又把已写的 ICLR 当成对的,真正的出处 CVPR 2025
+    永远上不来。ICLR/ICML/NeurIPS 的录用结果以 OpenReview 为准:它说这一届
+    撤了/拒了,别的源再说"中了"也不算 —— 除非 OpenReview 自己同一届也有录用记录。
+    workshop 记录不算:workshop 撤稿说明不了主会。
+    返回 (缩写, 年份, 缺年份时是否也算同届);OpenReview 在这个会有任何一届的
+    录用记录时,缺年份的一方不能拿来否定(可能正是录用的那一届)。
+    """
+    bad, ok = set(), set()
+    for v in or_venues:
+        if CORR.search(v) or WORKSHOP.search(v):
+            continue
+        ab, _ = canon_venue(v)
+        if ab:
+            (bad if NON_VENUE.search(v) else ok).add((ab, venue_year(v, None)))
+    took = {ab for ab, _ in ok}
+    return {(ab, y, ab not in took) for ab, y in bad - ok}
+
+
+def or_evidence(ev):
+    """证据列表里 OpenReview 那几条的 venue 串(缓存行只存了证据,没存原始返回)。"""
+    return [x[3:] for x in (ev or []) if x.startswith('OR:')]
+
+
+def venue_year(venue, year):
+    """年份:源给了就用,否则从 venue 串里取("ICLR 2025" 的 year 字段常是 None)。"""
+    if str(year).isdigit():
+        return int(year)
+    m = re.search(r'\b((?:19|20)\d{2})\b', venue or '')
+    return int(m.group(1)) if m else None
+
+
+def refused(venue, year, bad):
+    """这个 venue 是不是 OpenReview 说撤/拒了的那一届?bad 来自 or_refused。"""
+    ab, _ = canon_venue(venue or '')
+    y = venue_year(venue, year)
+    return bool(ab) and any(b == ab and (by == y or (wild and (by is None or y is None)))
+                            for b, by, wild in bad)
+
+
 def classify(orv, cr, dbl=None, am=None):
     """返回 (状态, 建议 venue, 证据列表)。
 
@@ -627,6 +675,7 @@ def classify(orv, cr, dbl=None, am=None):
             main.append(('openreview', v))
         else:
             weak = True          # 非白名单的 venue 串,多半是 workshop 简称
+    bad = or_refused(orv['venues'])
     for src, w in ([('AMINER', x) for x in (am or {}).get('venues', [])]
                    + [('CR', x) for x in cr['venues']]
                    + [('DBLP', x) for x in (dbl or {}).get('venues', [])]):
@@ -638,6 +687,8 @@ def classify(orv, cr, dbl=None, am=None):
         if NON_VENUE.search(w['venue']) or WORKSHOP.search(w['venue']):
             weak = True
             continue
+        if refused(w['venue'], w['year'], bad):
+            continue             # OpenReview 说这一届撤/拒了(weak 已由那条记录置上)
         if MAIN_VENUE.match(w['venue']):
             main.append((src.lower(), "%s|%s|doi:%s" % (w['venue'], w['year'], w['doi'])))
     if main:
@@ -1036,7 +1087,12 @@ def main():
         #    found" is exactly how an unverified entry passes as clean.
         #  - it predates the current schema: it has no anchor list, so it would
         #    be indistinguishable from an entry nothing could confirm.
-        if cached and not cached.get('errs') and cached.get('v') == CACHE_V:
+        #  - its suggestions still carry a venue OpenReview marks withdrawn or
+        #    rejected: it was classified before classify() refused those.
+        c_bad = or_refused(or_evidence((cached or {}).get('evidence')))
+        if (cached and not cached.get('errs') and cached.get('v') == CACHE_V
+                and not any(s != 'openreview' and refused(v.split('|')[0], None, c_bad)
+                            for s, v in cached.get('suggest') or [])):
             r = cached
         else:
             # AMiner first: it is the primary venue source, and asking it up
@@ -1077,9 +1133,15 @@ def main():
         # 判断当前 bib 写法是否已经正确
         cur = e['current']
         cur_is_arxiv = 'arxiv' in cur.lower()
+        # bib 写的 venue 正是 OpenReview 记为撤稿/拒稿的那一届(StreamingT2V 曾被
+        # 写成 ICLR 2025):它不是"已经写对的出处",铁律二不保护它。
+        cur_refused = not cur_is_arxiv and refused(
+            cur, e['year'], or_refused(or_evidence(r['evidence'])))
         flag = ''
         if r['status'] == 'PUBLISHED' and cur_is_arxiv:
             flag = '❗需改为正式出处'; need_action += 1
+        elif r['status'] == 'PUBLISHED' and cur_refused:
+            flag = '❗bib 写的出处在 OpenReview 上是撤稿/拒稿,需改为正式出处'; need_action += 1
         elif r['status'] == 'WORKSHOP_OR_REJECTED':
             flag = '⛔仅 workshop/被拒 —— 按收录标准应删除'; need_action += 1
         elif r['status'] == 'PREPRINT' and not cur_is_arxiv:
@@ -1113,8 +1175,10 @@ def main():
         # a conference and later in a journal (VBench is CVPR 2024 *and* shows a
         # TPAMI record), so promoting from the suggestion list would silently
         # re-cite it to the wrong one. Only reformat what is already there;
-        # consult the suggestions solely to promote an arXiv preprint.
-        cur_abbr, cur_spec = (None, None) if cur_is_arxiv or cur == '?' else canon_venue(cur)
+        # consult the suggestions solely to promote an arXiv preprint -- or to
+        # replace a venue OpenReview itself records as withdrawn/rejected.
+        cur_abbr, cur_spec = ((None, None) if cur_is_arxiv or cur == '?' or cur_refused
+                              else canon_venue(cur))
         if cur_abbr:
             if norm(cur) != norm(cur_spec['book']):
                 act.update(kind=cur_spec['kind'], book=cur_spec['book'])

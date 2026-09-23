@@ -99,6 +99,11 @@ $ python3 $S references.bib --add "LongLive: Real-time Interactive Long Video Ge
 
 > 这条是踩出来的:早期版本按"建议列表第一条"改写,把 VBench 从 CVPR 2024 悄悄改成了 TPAMI 期刊。
 
+**唯一例外:OpenReview 记为撤稿/拒稿的那一届不算"写对的出处"。** StreamingT2V 在 OpenReview 上是
+"ICLR 2025 Conference Withdrawn Submission",AMiner 却给了光秃秃的 "ICLR 2025",`--add` 就写成了 ICLR;
+真正的出处是 CVPR 2025(DOI 解析得到)。现在任何源给出 OpenReview 判为撤/拒的那一届都会被丢掉,
+bib 里已经写成那一届的条目会被标 ❗ 并由 `--fix` 换成正式出处。
+
 同理,`note` 字段是**合并**不是覆盖——里面的 `spotlight` / `oral` / 人工批注 API 查不到,覆盖就没了。
 
 ## 铁律三:分清「验过了」和「没验成」

@@ -103,6 +103,40 @@ _, main, _ = V.classify(
                  'type': 'proceedings-article'}]})
 check("aminer first", main[0][0], 'aminer')
 
+# StreamingT2V: OpenReview says "ICLR 2025 ... Withdrawn", AMiner says a bare
+# "ICLR 2025" (carrying the CVPR DOI). AMiner sorted first, so --add wrote ICLR.
+section("classify — a venue OpenReview marks withdrawn is not taken from AMiner")
+t2v_or = {'venues': ['CVPR 2025', 'ICLR 2025 Conference Withdrawn Submission']}
+t2v_am = {'venues': [{'venue': 'ICLR 2025', 'year': None,
+                      'doi': '10.1109/cvpr52734.2025.00245', 'type': 'proceedings-article'}]}
+t2v_cr = {'venues': [{'venue': '2025 IEEE/CVF Conference on Computer Vision and Pattern '
+                               'Recognition (CVPR)', 'year': 2025,
+                      'doi': '10.1109/cvpr52734.2025.00245', 'type': 'proceedings-article'}]}
+st, main, _ = V.classify(t2v_or, t2v_cr, None, t2v_am)
+check("still published", st, 'PUBLISHED')
+check("withdrawn ICLR dropped from the suggestions",
+      any(V.canon_venue(v.split('|')[0])[0] == 'ICLR' for _, v in main), False)
+check("CVPR proceedings chosen", V.pick_venue(main, '2025', None)['book'],
+      'Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)')
+st, _, _ = V.classify({'venues': ['ICLR 2025 Conference Withdrawn Submission']},
+                      {'venues': []}, None, t2v_am)
+check("withdrawn + AMiner only -> not published", st, 'WORKSHOP_OR_REJECTED')
+# Withdrawn one year, accepted the next: the accepted year must survive.
+st, main, _ = V.classify({'venues': ['ICLR 2024 Conference Withdrawn Submission',
+                                     'ICLR 2025 Poster']}, {'venues': []}, None,
+                         {'venues': [{'venue': 'ICLR 2025', 'year': 2025, 'doi': None,
+                                      'type': 'proceedings-article'}]})
+check("other year accepted -> kept", (st, main[0][0]), ('PUBLISHED', 'aminer'))
+bad = V.or_refused(['ICLR 2025 Conference Withdrawn Submission', 'CVPR 2025'])
+check("bib naming the withdrawn venue is refused",
+      V.refused('Proceedings of the International Conference on Learning Representations (ICLR)',
+                '2025', bad), True)
+check("bib naming the real venue is not",
+      V.refused('Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern '
+                'Recognition (CVPR)', '2025', bad), False)
+check("a workshop withdrawal says nothing about the main track",
+      V.or_refused(['ICML 2025 Workshop on Foo Withdrawn Submission']), set())
+
 
 # ------------------------------------------------------------------ bib edits
 section("merge_note — never drop a hand-written annotation")
@@ -122,6 +156,9 @@ check("entry count", len(ents), 4)
 by = {e['key']: e for e in ents}
 check("arXiv id extracted", by['selfforcing2025']['arxiv'], '2506.08009')
 check("DOI extracted from note", by['causvid2024']['doi'], '10.1109/CVPR52734.2025.02138')
+# "cvpr52734.2025.02138" once came back as arXiv id 2734.2025 and --fix wrote it
+# into the note.
+check("no arXiv id read out of a DOI", by['causvid2024']['arxiv'], None)
 check("current venue read", by['vbench2024']['current'], 'CVPR 2024')
 
 section("set_field — the last field of an entry must not be duplicated")
