@@ -164,6 +164,7 @@ def parse_bib(path):
             year=f.get('year', '?'),
             current=f.get('booktitle') or f.get('journal') or '?',
             arxiv=am.group(1) if am else None,
+            note=f.get('note', ''),
         ))
     return entries
 
@@ -585,6 +586,21 @@ def get_field(body, name):
     return ' '.join(re.sub(r'^[{"]|[}"]$', '', m.group(2).strip()).split())
 
 
+def dup_arxiv_note(current, note):
+    """The note without the arXiv id the journal field already prints, or None.
+
+    A preprint's journal reads "arXiv preprint arXiv:<id>"; the same id in the
+    note prints a second time (Wan: "arXiv:2503.20314. arXiv:2503.20314").
+    Returns None when nothing repeats, else the remaining note ('' = drop it).
+    """
+    cid = re.search(r'arxiv[^0-9]*(\d{4}\.\d{4,5})', current or '', re.I)
+    toks = [t.strip() for t in (note or '').split(';') if t.strip()]
+    if not cid or not toks:
+        return None
+    keep = [t for t in toks if cid.group(1) not in t]
+    return None if len(keep) == len(toks) else '; '.join(keep)
+
+
 def merge_note(old, new):
     """Union the two notes, keeping order and never dropping what was there.
 
@@ -786,6 +802,9 @@ def apply_fixes(bib_path, plan):
             merged = merge_note(get_field(new, 'note'), act.get('note'))
             if merged:
                 new = set_field(new, 'note', merged)
+        if 'note_set' in act:
+            new = (set_field(new, 'note', act['note_set']) if act['note_set']
+                   else drop_field(new, 'note'))
         if new != body or newtyp != typ:
             new = tidy(new)
             out = out[:m.start()] + '@%s{%s,%s\n}' % (newtyp, key, new) + out[m.end():]
@@ -1186,6 +1205,11 @@ def main():
             chosen = pick_venue(r['suggest'], e['year'], e['arxiv'])
             if chosen:
                 act.update(chosen)
+        dup = dup_arxiv_note(cur, e.get('note')) if cur_is_arxiv else None
+        if dup is not None:
+            act['note_set'] = dup
+            flag += ' | 🔁note 重复了 journal 里的 arXiv 号'
+            need_action += 1
         if act:
             plan[e['key']] = act
             if act.get('book') and not flag:

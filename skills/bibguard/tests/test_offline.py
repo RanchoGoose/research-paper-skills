@@ -335,6 +335,31 @@ check("a rate-limited entry is never called 查无此文",
 check("None anchors behaves like empty",
       '🟡' in V.anchor_flag(None, ['HTTPError:HTTP Error 429']), True)
 
+# ------------------------------------------------- duplicate arXiv id in note
+section("dup_arxiv_note — a preprint must not print its arXiv id twice")
+check("wan: note repeats the journal id -> drop the note",
+      V.dup_arxiv_note('arXiv preprint arXiv:2503.20314', 'arXiv:2503.20314'), '')
+check("other tokens survive",
+      V.dup_arxiv_note('arXiv preprint arXiv:2503.20314',
+                       'Oral; arXiv:2503.20314; doi:10.1/x'), 'Oral; doi:10.1/x')
+check("different id is not a duplicate",
+      V.dup_arxiv_note('arXiv preprint arXiv:2503.20314', 'arXiv:2401.01256'), None)
+check("published venue is left alone",
+      V.dup_arxiv_note('Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)',
+                       'arXiv:2503.20314'), None)
+check("no note, nothing to do",
+      V.dup_arxiv_note('arXiv preprint arXiv:2503.20314', ''), None)
+import tempfile                                            # noqa: E402
+with tempfile.TemporaryDirectory() as d:
+    bp = os.path.join(d, 'x.bib')
+    open(bp, 'w').write('@article{wan2025,\n  title   = {Wan},\n'
+                        '  journal = {arXiv preprint arXiv:2503.20314},\n'
+                        '  year    = {2025},\n  note    = {arXiv:2503.20314}\n}\n')
+    V.apply_fixes(bp, {'wan2025': {'note_set': ''}})
+    out = open(bp).read()
+    check("apply_fixes drops the repeated note", 'note' in out, False)
+    check("apply_fixes keeps the journal id", 'arXiv:2503.20314' in out, True)
+
 # --------------------------------------------------------------------- report
 print("\n%s" % ("=" * 52))
 if FAIL:
